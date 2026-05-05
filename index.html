@@ -1,741 +1,381 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BURGER SMASH by Burgerboy</title>
-    
-    <!-- Google Fonts: Caprasimo -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caprasimo&display=swap" rel="stylesheet">
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 
-    <style>
-        :root {
-            --c-red: #c7473d;
-            --c-yellow: #fab934;
-            --c-cream: #fff3e2;
-            --c-black: #1d1e1b;
-        }
+// --- CONFIGURACIÓN DE FIREBASE ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+const auth = app ? getAuth(app) : null;
+const db = app ? getFirestore(app) : null;
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'burger-smash-2026';
 
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-drag: none;
-        }
+// --- ESTILOS CSS INYECTADOS (Animaciones Retro Cuphead) ---
+const customStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Caprasimo&display=swap');
 
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--c-black);
-            font-family: 'Caprasimo', serif;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            touch-action: manipulation;
-        }
+  body, html {
+    margin: 0; padding: 0; background-color: #1d1e1b; overflow: hidden;
+    touch-action: manipulation; user-select: none; -webkit-user-drag: none;
+  }
+  
+  .caprasimo { font-family: 'Caprasimo', serif; }
+  .font-sans { font-family: sans-serif; }
+  
+  /* Animaciones */
+  .tipsy { animation: tipsy 3s ease-in-out infinite alternate; }
+  .tipsy-mild { animation: tipsy-mild 4s ease-in-out infinite alternate; }
+  .pulse { animation: pulse 1.5s infinite; }
+  .pendulum { transform-origin: bottom center; animation: pendulum 2s ease-in-out infinite alternate; }
+  .falling-ingredient { animation: fallAndSpin linear forwards; }
+  
+  /* Utilidades visuales retro */
+  .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
+  .text-stroke-small { text-shadow: 1px 1px 0 #1d1e1b, -1px -1px 0 #1d1e1b, 1px -1px 0 #1d1e1b, -1px 1px 0 #1d1e1b; }
+  .text-stroke-yellow { text-shadow: 1px 1px 0 #1d1e1b; }
+  
+  /* Botones 3D */
+  .btn-shadow { box-shadow: 0px 8px 0px #1d1e1b; transition: transform 0.1s, box-shadow 0.1s; }
+  .btn-shadow:active { transform: translateY(8px); box-shadow: 0px 0px 0px #1d1e1b; }
+  .btn-shadow-small { box-shadow: 0px 5px 0px #1d1e1b; transition: transform 0.1s, box-shadow 0.1s; }
+  .btn-shadow-small:active { transform: translateY(5px); box-shadow: 0px 0px 0px #1d1e1b; }
 
-        /* Contenedor principal que mantiene proporción móvil */
-        #game-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            max-width: 500px; /* Límite para vista en escritorio */
-            background-color: var(--c-black);
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-        }
+  /* Keyframes */
+  @keyframes tipsy { 0% { transform: rotate(-3deg) scale(0.98); } 100% { transform: rotate(3deg) scale(1.02); } }
+  @keyframes tipsy-mild { 0% { transform: rotate(-1.5deg) scale(0.99); } 100% { transform: rotate(1.5deg) scale(1.01); } }
+  @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
+  @keyframes pendulum { 0% { transform: rotate(-8deg); } 100% { transform: rotate(8deg); } }
+  @keyframes fallAndSpin { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(120vh) rotate(360deg); } }
 
-        /* Overlay Textura */
-        #texture-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url('https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/overlay.png?raw=true');
-            background-size: cover;
-            background-position: center;
-            pointer-events: none; /* CRÍTICO: Permite hacer clic a través de la textura */
-            z-index: 9999;
-            mix-blend-mode: multiply; /* Para dar efecto de desgaste */
-            opacity: 0.6;
-        }
+  /* Scrollbar retro para modal */
+  .retro-scroll::-webkit-scrollbar { width: 8px; }
+  .retro-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+  .retro-scroll::-webkit-scrollbar-thumb { background: #1d1e1b; border-radius: 4px; }
+`;
 
-        /* Pantallas */
-        .screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            background-size: cover;
-            background-position: center;
-            z-index: 10;
-        }
+export default function App() {
+    // --- ESTADOS ---
+    const [screen, setScreen] = useState('splash');
+    const [loaded, setLoaded] = useState(false);
+    const [fallingItems, setFallingItems] = useState([]);
+    const [user, setUser] = useState(null);
 
-        .screen.active {
-            display: flex;
-        }
+    // Formulario de Registro
+    const [name, setName] = useState('');
+    const [dni, setDni] = useState('');
+    const [tyc, setTyc] = useState(false);
+    const [namePlaceholder, setNamePlaceholder] = useState('');
+    const [tycError, setTycError] = useState(false);
+    const [playText, setPlayText] = useState('JUGAR');
 
-        /* --- SPLASHSCREEN --- */
-        #splash-screen {
-            background-image: url('https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/fondosplash.png?raw=true');
-            justify-content: space-between;
-            padding: 10vh 0 0 0;
-        }
+    // Modales
+    const [showTyc, setShowTyc] = useState(false);
+    const [showRanking, setShowRanking] = useState(false);
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [loadingRanking, setLoadingRanking] = useState(false);
 
-        .falling-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: 1; /* Detrás del logo */
-        }
-
-        .falling-ingredient {
-            position: absolute;
-            top: -100px;
-            animation: fallAndSpin linear forwards;
-        }
-
-        @keyframes fallAndSpin {
-            0% { transform: translateY(0) rotate(0deg); }
-            100% { transform: translateY(120vh) rotate(360deg); }
-        }
-
-        .logo-container {
-            position: relative;
-            z-index: 2;
-            width: 80%;
-            max-width: 350px;
-            animation: tipsy 3s ease-in-out infinite alternate;
-        }
-
-        .logo-container img {
-            width: 100%;
-            height: auto;
-            filter: drop-shadow(0px 8px 0px var(--c-black));
-        }
-
-        @keyframes tipsy {
-            0% { transform: rotate(-3deg) scale(0.98); }
-            100% { transform: rotate(3deg) scale(1.02); }
-        }
-
-        .enter-text {
-            color: var(--c-cream);
-            font-size: 2.5rem;
-            text-transform: uppercase;
-            text-shadow: 2px 2px 0 var(--c-black), -2px -2px 0 var(--c-black), 2px -2px 0 var(--c-black), -2px 2px 0 var(--c-black), 0px 5px 0px rgba(0,0,0,0.5);
-            letter-spacing: 2px;
-            z-index: 2;
-            cursor: pointer;
-            margin-top: -5vh;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.8; }
-        }
-
-        .cartel-container {
-            width: 60%;
-            max-width: 250px;
-            z-index: 2;
-            transform-origin: bottom center;
-            animation: pendulum 2s ease-in-out infinite alternate;
-            margin-bottom: -10px; /* Para que salga bien desde abajo */
-        }
-
-        .cartel-container img {
-            width: 100%;
-            height: auto;
-            filter: drop-shadow(0px 5px 0px var(--c-black));
-        }
-
-        @keyframes pendulum {
-            0% { transform: rotate(-8deg); }
-            100% { transform: rotate(8deg); }
-        }
-
-        /* --- REGISTRO --- */
-        #register-screen {
-            background-image: url('https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/fondoregistro.png?raw=true');
-            justify-content: flex-start;
-            padding-top: 5vh;
-        }
-
-        .reg-logo {
-            width: 60%;
-            max-width: 250px;
-            animation: tipsy 3s ease-in-out infinite alternate;
-            margin-bottom: 2vh;
-        }
-
-        .reg-title {
-            width: 70%;
-            max-width: 280px;
-            animation: tipsy-mild 4s ease-in-out infinite alternate;
-            margin-bottom: 3vh;
-        }
-
-        @keyframes tipsy-mild {
-            0% { transform: rotate(-1.5deg) scale(0.99); }
-            100% { transform: rotate(1.5deg) scale(1.01); }
-        }
-
-        .form-container {
-            display: flex;
-            flex-direction: column;
-            width: 80%;
-            max-width: 320px;
-            gap: 10px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .form-group label {
-            color: var(--c-cream);
-            font-size: 1.2rem;
-            text-shadow: 2px 2px 0 var(--c-black), -2px -2px 0 var(--c-black), 2px -2px 0 var(--c-black), -2px 2px 0 var(--c-black);
-            margin-bottom: 5px;
-            letter-spacing: 1px;
-        }
-
-        .retro-input {
-            width: 100%;
-            background-color: var(--c-cream);
-            border: 4px solid var(--c-black);
-            border-radius: 30px;
-            padding: 10px 20px;
-            font-family: 'Caprasimo', serif;
-            font-size: 1.2rem;
-            color: var(--c-black);
-            text-align: center;
-            outline: none;
-            box-shadow: 0px 5px 0px rgba(0,0,0,0.3) inset;
-        }
-
-        .tyc-group {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            margin-top: 10px;
-            padding: 0 10px;
-        }
-
-        .retro-checkbox {
-            appearance: none;
-            min-width: 24px;
-            height: 24px;
-            background-color: var(--c-cream);
-            border: 3px solid var(--c-black);
-            border-radius: 5px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            margin-top: 3px;
-        }
-
-        .retro-checkbox:checked::after {
-            content: 'X';
-            font-family: 'Caprasimo', serif;
-            color: var(--c-black);
-            font-size: 18px;
-            line-height: 1;
-        }
-
-        .tyc-text {
-            color: var(--c-cream);
-            font-size: 0.8rem;
-            line-height: 1.2;
-            text-shadow: 1px 1px 0 var(--c-black), -1px -1px 0 var(--c-black), 1px -1px 0 var(--c-black), -1px 1px 0 var(--c-black);
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
-        .buttons-container {
-            margin-top: auto;
-            margin-bottom: 5vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            width: 100%;
-        }
-
-        .btn-jugar {
-            background-color: var(--c-cream);
-            color: var(--c-black);
-            border: 5px solid var(--c-black);
-            border-radius: 40px;
-            padding: 10px 40px;
-            font-family: 'Caprasimo', serif;
-            font-size: 2.5rem;
-            cursor: pointer;
-            box-shadow: 0px 8px 0px var(--c-black);
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-
-        .btn-jugar:active {
-            transform: translateY(8px);
-            box-shadow: 0px 0px 0px var(--c-black);
-        }
-
-        .btn-ranking {
-            background-color: var(--c-red);
-            color: var(--c-cream);
-            border: 4px solid var(--c-black);
-            border-radius: 25px;
-            padding: 5px 25px;
-            font-family: 'Caprasimo', serif;
-            font-size: 1.2rem;
-            cursor: pointer;
-            box-shadow: 0px 5px 0px var(--c-black);
-            animation: tipsy-mild 4s ease-in-out infinite alternate;
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-
-        .btn-ranking:active {
-            transform: translateY(5px);
-            box-shadow: 0px 0px 0px var(--c-black);
-        }
-
-        /* --- MODALES --- */
-        .modal-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal-box {
-            background-color: var(--c-cream);
-            border: 6px solid var(--c-black);
-            border-radius: 20px;
-            width: 85%;
-            max-height: 80%;
-            padding: 20px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0px 10px 0px var(--c-black);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: -15px;
-            right: -15px;
-            background-color: var(--c-red);
-            color: var(--c-cream);
-            border: 4px solid var(--c-black);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-family: 'Caprasimo', serif;
-            font-size: 1.5rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0px 4px 0px var(--c-black);
-        }
-
-        .modal-close:active {
-            transform: translateY(4px);
-            box-shadow: 0px 0px 0px var(--c-black);
-        }
-
-        .modal-title {
-            color: var(--c-black);
-            text-align: center;
-            font-size: 1.8rem;
-            margin-bottom: 15px;
-            margin-top: 0;
-        }
-
-        .modal-content {
-            overflow-y: auto;
-            flex-grow: 1;
-            font-family: sans-serif; /* TyC es más legible en sans-serif */
-            font-size: 0.9rem;
-            color: var(--c-black);
-            line-height: 1.4;
-            padding-right: 10px;
-        }
-
-        .modal-content::-webkit-scrollbar {
-            width: 8px;
-        }
-        .modal-content::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.1);
-            border-radius: 4px;
-        }
-        .modal-content::-webkit-scrollbar-thumb {
-            background: var(--c-black);
-            border-radius: 4px;
-        }
-
-        /* Leaderboard Styles */
-        .lb-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            font-family: 'Caprasimo', serif;
-        }
-        .lb-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            border-bottom: 2px dashed var(--c-black);
-            font-size: 1.2rem;
-        }
-        .lb-item:last-child {
-            border-bottom: none;
-        }
-        .lb-rank { color: var(--c-red); width: 30px;}
-        .lb-name { flex-grow: 1; text-align: left; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-        .lb-score { color: var(--c-yellow); text-shadow: 1px 1px 0 var(--c-black); }
-
-    </style>
-</head>
-<body>
-
-<div id="game-container">
-    <!-- Capa de textura global -->
-    <div id="texture-overlay"></div>
-
-    <!-- PANTALLA 1: SPLASHSCREEN -->
-    <div id="splash-screen" class="screen active">
-        <div class="falling-container" id="falling-container">
-            <!-- Ingredientes cayendo se inyectan aquí via JS -->
-        </div>
-        
-        <div class="logo-container">
-            <img src="https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/logo.png?raw=true" alt="Burger Smash Logo" id="splash-logo" style="opacity:0;">
-        </div>
-
-        <div class="enter-text" id="enter-btn">CARGANDO...</div>
-
-        <div class="cartel-container">
-            <img src="https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/cartel.png?raw=true" alt="Burger Fest" id="splash-cartel" style="opacity:0;">
-        </div>
-    </div>
-
-    <!-- PANTALLA 2: REGISTRO -->
-    <div id="register-screen" class="screen">
-        <img src="https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/logo.png?raw=true" alt="Logo" class="reg-logo">
-        <img src="https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/registro.png?raw=true" alt="Registro" class="reg-title">
-
-        <div class="form-container">
-            <div class="form-group">
-                <label>NOMBRE:</label>
-                <input type="text" id="reg-name" class="retro-input" maxlength="15" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label>DNI/CE:</label>
-                <input type="tel" id="reg-dni" class="retro-input" maxlength="12" autocomplete="off">
-            </div>
-            <div class="tyc-group">
-                <input type="checkbox" id="reg-tyc" class="retro-checkbox">
-                <div class="tyc-text" id="open-tyc">Acepto los términos y condiciones y el tratamiento opcional de datos.</div>
-            </div>
-        </div>
-
-        <div class="buttons-container">
-            <button class="btn-jugar" id="btn-jugar">JUGAR</button>
-            <button class="btn-ranking" id="btn-ranking">RANKING</button>
-        </div>
-    </div>
-
-    <!-- MODAL TYC -->
-    <div class="modal-overlay" id="modal-tyc">
-        <div class="modal-box">
-            <button class="modal-close" onclick="closeModal('modal-tyc')">X</button>
-            <h2 class="modal-title">Términos y Condiciones</h2>
-            <div class="modal-content">
-                <p><strong>1. Aceptación:</strong> Al participar en BURGER SMASH, aceptas estos términos y condiciones para el evento Burgerfest 2026.</p>
-                <p><strong>2. Uso de datos:</strong> Autorizas a Burgerboy a recopilar tu Nombre y DNI/CE con el único fin de identificarte en la tabla de clasificación (Ranking) y contactarte en caso de ganar premios.</p>
-                <p><strong>3. Mecánica:</strong> El juego es de habilidad. Las puntuaciones se guardan automáticamente si tienes conexión a internet.</p>
-                <p><strong>4. Restricciones:</strong> Cualquier intento de manipulación del sistema o uso de bots resultará en la descalificación inmediata del leaderboard.</p>
-                <p><strong>5. Privacidad:</strong> Tus datos no serán compartidos con terceros sin tu consentimiento explícito, más allá de la gestión del Burgerfest.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL RANKING -->
-    <div class="modal-overlay" id="modal-ranking">
-        <div class="modal-box">
-            <button class="modal-close" onclick="closeModal('modal-ranking')">X</button>
-            <h2 class="modal-title">TOP 10 SMASHERS</h2>
-            <div class="modal-content">
-                <ul class="lb-list" id="leaderboard-list">
-                    <li style="text-align:center; font-family:sans-serif;">Cargando ranking...</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- Firebase & Lógica de la App -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // --- CONFIGURACIÓN E INICIALIZACIÓN ---
     const baseUrl = 'https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/';
     const rawSuffix = '?raw=true';
-    
-    // Assets para preloader
-    const assetsToLoad = [
-        'overlay.png',
-        'fondosplash.png',
-        'fondoregistro.png',
-        'logo.png',
-        'cartel.png',
-        'registro.png',
-        'carne.png',
-        'lechuga.png',
-        'papas.png',
-        'tomate.png'
-    ];
-    let loadedAssets = 0;
-    let isAppReady = false;
+    const bgMusic = useRef(null);
 
-    // Audio
-    const bgMusic = new Audio(baseUrl + 'Sugarcup-Shuffle.aac' + rawSuffix);
-    bgMusic.loop = true;
-    bgMusic.volume = 0.5;
+    // --- EFECTOS E INICIALIZACIÓN ---
+    useEffect(() => {
+        // Inyectar CSS global
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = customStyles;
+        document.head.appendChild(styleSheet);
 
-    // Variables globales
-    let currentScreen = 'splash';
-    let fallingInterval;
-    
-    // Firebase App ID (Fallback si no estamos en entorno de preview)
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'burger-smash-2026';
-    let db, auth;
-
-    // Inicializar Firebase
-    async function initFirebase() {
-        try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-            if (firebaseConfig) {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                // REGLA 3: Autenticación PRIMERO
-                await signInAnonymously(auth);
-                console.log("Firebase inicializado y usuario anónimo autenticado.");
-            } else {
-                console.warn("Configuración de Firebase no encontrada. Ejecutando en modo local.");
-            }
-        } catch (error) {
-            console.error("Error inicializando Firebase:", error);
-        }
-    }
-
-    // --- PRELOADER ---
-    function preloadAssets() {
+        // Preloader de assets
+        const assetsToLoad = [
+            'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 
+            'logo.png', 'cartel.png', 'registro.png', 
+            'carne.png', 'lechuga.png', 'papas.png', 'tomate.png'
+        ];
+        
+        let loadedCount = 0;
         assetsToLoad.forEach(asset => {
             const img = new Image();
             img.src = baseUrl + asset + rawSuffix;
-            img.onload = () => {
-                loadedAssets++;
-                if (loadedAssets === assetsToLoad.length) {
-                    appReady();
-                }
-            };
-            img.onerror = () => {
-                // Manejo básico de error para no trabar la carga
-                loadedAssets++;
-                if (loadedAssets === assetsToLoad.length) appReady();
-            };
+            img.onload = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
+            img.onerror = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
         });
-    }
 
-    function appReady() {
-        isAppReady = true;
-        const enterBtn = document.getElementById('enter-btn');
-        enterBtn.innerText = 'ENTRAR';
+        // Configuración de Audio (referencia persistente)
+        bgMusic.current = new Audio(baseUrl + 'Sugarcup-Shuffle.aac' + rawSuffix);
+        bgMusic.current.loop = true;
+        bgMusic.current.volume = 0.5;
+
+        // Firebase Auth Init
+        if (!auth) return;
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+        };
+        initAuth();
+        const unsubscribe = onAuthStateChanged(auth, setUser);
         
-        // Mostrar elementos ocultos para evitar popping visual
-        document.getElementById('splash-logo').style.opacity = '1';
-        document.getElementById('splash-cartel').style.opacity = '1';
+        return () => {
+            document.head.removeChild(styleSheet);
+            unsubscribe();
+        };
+    }, []);
 
-        // Iniciar lluvia de ingredientes
-        startFallingIngredients();
+    // Lluvia de ingredientes
+    useEffect(() => {
+        if (screen !== 'splash' || !loaded) return;
+        const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
         
-        // Iniciar Firebase en segundo plano una vez que la UI está lista
-        initFirebase();
-    }
-
-    // --- ANIMACIONES Y EFECTOS ---
-    function startFallingIngredients() {
-        const container = document.getElementById('falling-container');
-        const ingredients = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
-        
-        fallingInterval = setInterval(() => {
-            if (currentScreen !== 'splash') return;
+        const interval = setInterval(() => {
+            const newItem = {
+                id: Math.random().toString(36).substr(2, 9),
+                type: types[Math.floor(Math.random() * types.length)],
+                size: Math.random() * 40 + 40,
+                left: Math.random() * 90,
+                duration: Math.random() * 3 + 3
+            };
             
-            const el = document.createElement('img');
-            const type = ingredients[Math.floor(Math.random() * ingredients.length)];
-            el.src = baseUrl + type + rawSuffix;
-            el.className = 'falling-ingredient';
+            setFallingItems(prev => [...prev, newItem]);
             
-            // Tamaño random entre 40px y 80px
-            const size = Math.random() * 40 + 40;
-            el.style.width = `${size}px`;
-            
-            // Posición X horizontal random
-            el.style.left = `${Math.random() * 90}vw`;
-            
-            // Duración random de caída (entre 3s y 6s)
-            const duration = Math.random() * 3 + 3;
-            el.style.animationDuration = `${duration}s`;
-
-            container.appendChild(el);
-
-            // Limpiar DOM después de la animación
+            // Limpieza de ingredientes que caen para liberar memoria
             setTimeout(() => {
-                if(el.parentElement) el.remove();
-            }, duration * 1000);
+                setFallingItems(prev => prev.filter(i => i.id !== newItem.id));
+            }, newItem.duration * 1000);
             
-        }, 800); // Generar uno nuevo cada 0.8s
-    }
+        }, 800);
 
-    // --- NAVEGACIÓN Y EVENTOS ---
-    document.getElementById('enter-btn').addEventListener('click', () => {
-        if (!isAppReady) return;
-        
-        // Iniciar música tras interacción del usuario (política de navegadores)
-        bgMusic.play().catch(e => console.log("Audio play failed:", e));
+        return () => clearInterval(interval);
+    }, [screen, loaded]);
 
-        // Transición de pantalla
-        document.getElementById('splash-screen').classList.remove('active');
-        document.getElementById('register-screen').classList.add('active');
-        currentScreen = 'register';
-    });
+    // --- ACCIONES ---
+    const handleEnterClick = () => {
+        if (!loaded) return;
+        bgMusic.current?.play().catch(e => console.log("Audio bloqueado:", e));
+        setScreen('register');
+    };
 
-    // Validar Formulario y Jugar
-    document.getElementById('btn-jugar').addEventListener('click', () => {
-        const name = document.getElementById('reg-name').value.trim();
-        const dni = document.getElementById('reg-dni').value.trim();
-        const tyc = document.getElementById('reg-tyc').checked;
-
-        if (!name || !dni) {
-            // Se usa alerta de sistema por simplicidad en esta fase, en fases futuras se hará un toast custom
-            // Pero como la regla prohíbe alert(), usaremos un modal o cambiaremos placeholder.
-            document.getElementById('reg-name').placeholder = "FALTA DATOS!";
+    const handlePlayClick = () => {
+        if (!name.trim() || !dni.trim()) {
+            setNamePlaceholder("¡FALTAN DATOS!");
+            setName('');
+            setDni('');
             return;
         }
         if (!tyc) {
-            const tycText = document.getElementById('open-tyc');
-            tycText.style.color = "var(--c-red)";
-            setTimeout(() => tycText.style.color = "var(--c-cream)", 1000);
+            setTycError(true);
+            setTimeout(() => setTycError(false), 1000);
             return;
         }
 
-        // Guardar estado localmente (en memoria) para cuando se cree el gameloop
-        window.playerData = { name, dni };
-        console.log("Listo para jugar:", window.playerData);
+        // Estado guardado en ventana (o contexto en un futuro) para gameloop
+        window.playerData = { name: name.trim(), dni: dni.trim() };
         
-        // AQUÍ IRÍA LA TRANSICIÓN A LA PANTALLA DEL TUTORIAL (Parte 2)
-        document.getElementById('btn-jugar').innerText = "Cargando...";
+        setPlayText("CARGANDO...");
         setTimeout(() => {
-            document.getElementById('btn-jugar').innerText = "JUGAR";
-            console.log("Transición a tutorial pendiente para la siguiente fase.");
+            setPlayText("JUGAR");
+            console.log("Transición a tutorial lista. (Siguiente iteración)");
         }, 1000);
-    });
-
-    // Modales
-    document.getElementById('open-tyc').addEventListener('click', () => {
-        document.getElementById('modal-tyc').classList.add('active');
-    });
-
-    window.closeModal = function(id) {
-        document.getElementById(id).classList.remove('active');
     };
 
-    // Firebase Leaderboard Logic
-    document.getElementById('btn-ranking').addEventListener('click', async () => {
-        const modal = document.getElementById('modal-ranking');
-        modal.classList.add('active');
-        const listContainer = document.getElementById('leaderboard-list');
-        
-        if (!auth || !auth.currentUser) {
-            listContainer.innerHTML = '<li style="text-align:center; font-family:sans-serif;">Conectando al servidor...</li>';
-            return;
-        }
-
-        listContainer.innerHTML = '<li style="text-align:center; font-family:sans-serif;">Cargando data...</li>';
-
+    const fetchLeaderboard = async () => {
+        setShowRanking(true);
+        if (!user || !db) return;
+        setLoadingRanking(true);
         try {
-            // REGLA 1: Path estricto para data pública
-            // REGLA 2: No usar orderBy ni limit en la query, se procesa en memoria
             const lbRef = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
             const snapshot = await getDocs(lbRef);
-            
             let scores = [];
-            snapshot.forEach(doc => {
-                scores.push({ id: doc.id, ...doc.data() });
-            });
-
-            // Ordenar en memoria (Mayor puntaje primero)
-            scores.sort((a, b) => b.score - a.score);
+            snapshot.forEach(doc => scores.push({ id: doc.id, ...doc.data() }));
             
-            // Tomar solo el Top 10
-            const top10 = scores.slice(0, 10);
-
-            if (top10.length === 0) {
-                listContainer.innerHTML = '<li style="text-align:center; font-family:sans-serif;">¡Aún no hay puntuaciones! Sé el primero.</li>';
-            } else {
-                listContainer.innerHTML = top10.map((entry, index) => `
-                    <li class="lb-item">
-                        <span class="lb-rank">#${index + 1}</span>
-                        <span class="lb-name">${entry.name}</span>
-                        <span class="lb-score">${entry.score} pts</span>
-                    </li>
-                `).join('');
-            }
-
+            // Ordenar descendentemente en memoria (Regla Firebase)
+            scores.sort((a, b) => b.score - a.score);
+            setLeaderboard(scores.slice(0, 10));
         } catch (error) {
             console.error("Error cargando leaderboard:", error);
-            listContainer.innerHTML = '<li style="text-align:center; font-family:sans-serif;">Error al cargar el ranking.</li>';
         }
-    });
+        setLoadingRanking(false);
+    };
 
-    // Iniciar carga
-    preloadAssets();
+    return (
+        <div className="flex justify-center items-center w-full h-screen bg-[#1d1e1b]">
+            <div className="relative w-full h-full max-w-[500px] bg-[#1d1e1b] overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+                
+                {/* Overlay Global Texturizado */}
+                <div 
+                    className="absolute inset-0 z-[9999] pointer-events-none mix-blend-multiply opacity-60 bg-cover bg-center" 
+                    style={{ backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})` }}
+                ></div>
 
-</script>
-</body>
-</html>
+                {/* --- PANTALLA 1: SPLASH --- */}
+                {screen === 'splash' && (
+                    <div 
+                        className="absolute inset-0 z-10 flex flex-col items-center bg-cover bg-center cursor-pointer"
+                        style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
+                        onClick={handleEnterClick}
+                    >
+                        {/* Contenedor de ingredientes que caen */}
+                        <div className="absolute inset-0 overflow-hidden z-[1] pointer-events-none">
+                            {fallingItems.map(item => (
+                                <img 
+                                    key={item.id}
+                                    src={`${baseUrl}${item.type}${rawSuffix}`} 
+                                    alt="ingrediente"
+                                    className="absolute falling-ingredient"
+                                    style={{ 
+                                        width: `${item.size}px`, 
+                                        left: `${item.left}vw`, 
+                                        animationDuration: `${item.duration}s` 
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Logo Centrado */}
+                        <div className="flex-grow flex items-center justify-center w-full">
+                            <div className="relative z-[2] w-[90%] max-w-[400px] tipsy pb-[5vh]">
+                                <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
+                            </div>
+                        </div>
+
+                        {/* Tercio Inferior: Texto y Cartel */}
+                        <div className="flex flex-col items-center w-full z-[2] pb-4">
+                            <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest drop-shadow-[0_5px_0_rgba(0,0,0,0.5)] mb-4">
+                                {loaded ? 'ENTRAR' : 'CARGANDO...'}
+                            </div>
+
+                            {/* Cartel Metrónomo */}
+                            <div className="w-[45%] max-w-[180px] pendulum -mb-[10px]">
+                                <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- PANTALLA 2: REGISTRO --- */}
+                {screen === 'register' && (
+                    <div 
+                        className="absolute inset-0 z-10 flex flex-col items-center justify-start pt-[5vh] bg-cover bg-center"
+                        style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
+                    >
+                        <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[60%] max-w-[250px] tipsy mb-[2vh]" />
+                        <img src={`${baseUrl}registro.png${rawSuffix}`} alt="Registro" className="w-[70%] max-w-[280px] tipsy-mild mb-[3vh]" />
+
+                        <div className="flex flex-col w-[80%] max-w-[320px] gap-3">
+                            <div className="flex flex-col items-center">
+                                <label className="text-[#fff3e2] text-xl caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
+                                <input 
+                                    type="text" 
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder={namePlaceholder}
+                                    maxLength="15"
+                                    className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-5 py-2 caprasimo text-xl text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50"
+                                />
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <label className="text-[#fff3e2] text-xl caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
+                                <input 
+                                    type="tel" 
+                                    value={dni}
+                                    onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} // Solo números
+                                    maxLength="12"
+                                    className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-5 py-2 caprasimo text-xl text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]"
+                                />
+                            </div>
+                            
+                            <div className="flex items-start gap-3 mt-2 px-2">
+                                <div className="relative flex-shrink-0 cursor-pointer mt-1" onClick={() => setTyc(!tyc)}>
+                                    <div className="w-6 h-6 bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded flex items-center justify-center">
+                                        {tyc && <span className="text-[#1d1e1b] caprasimo text-lg leading-none mt-1">X</span>}
+                                    </div>
+                                </div>
+                                <div 
+                                    className={`text-xs leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`}
+                                    onClick={() => setShowTyc(true)}
+                                >
+                                    Acepto los términos y condiciones y el tratamiento opcional de datos.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-auto mb-[5vh] flex flex-col items-center gap-4 w-full">
+                            <button 
+                                onClick={handlePlayClick}
+                                className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-4xl btn-shadow"
+                            >
+                                {playText}
+                            </button>
+                            <button 
+                                onClick={fetchLeaderboard}
+                                className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-xl btn-shadow-small tipsy-mild"
+                            >
+                                RANKING
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- MODAL: TYC --- */}
+                {showTyc && (
+                    <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                        <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
+                            <button 
+                                onClick={() => setShowTyc(false)} 
+                                className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small"
+                            >
+                                X
+                            </button>
+                            <h2 className="text-[#1d1e1b] text-center text-2xl caprasimo mb-4 mt-0">Términos y Condiciones</h2>
+                            <div className="overflow-y-auto flex-grow font-sans text-[0.9rem] text-[#1d1e1b] leading-relaxed pr-2 retro-scroll">
+                                <p className="mb-2"><strong>1. Aceptación:</strong> Al participar en BURGER SMASH, aceptas estos términos y condiciones para el evento Burgerfest 2026.</p>
+                                <p className="mb-2"><strong>2. Uso de datos:</strong> Autorizas a Burgerboy a recopilar tu Nombre y DNI/CE con el único fin de identificarte en la tabla de clasificación y contactarte.</p>
+                                <p className="mb-2"><strong>3. Mecánica:</strong> El juego es de habilidad. Las puntuaciones se guardan automáticamente con conexión a internet.</p>
+                                <p className="mb-2"><strong>4. Restricciones:</strong> Cualquier intento de manipulación del sistema o bots resultará en descalificación.</p>
+                                <p><strong>5. Privacidad:</strong> Tus datos no serán compartidos con terceros sin tu consentimiento.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- MODAL: RANKING --- */}
+                {showRanking && (
+                    <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                        <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
+                            <button 
+                                onClick={() => setShowRanking(false)} 
+                                className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small"
+                            >
+                                X
+                            </button>
+                            <h2 className="text-[#1d1e1b] text-center text-2xl caprasimo mb-4 mt-0">TOP 10 SMASHERS</h2>
+                            <div className="overflow-y-auto flex-grow pr-2 retro-scroll">
+                                <ul className="list-none p-0 m-0 caprasimo">
+                                    {loadingRanking ? (
+                                        <li className="text-center font-sans text-lg">Cargando data...</li>
+                                    ) : leaderboard.length === 0 ? (
+                                        <li className="text-center font-sans text-lg">¡Aún no hay puntuaciones! Sé el primero.</li>
+                                    ) : (
+                                        leaderboard.map((entry, index) => (
+                                            <li key={entry.id} className="flex justify-between py-2 border-b-2 border-dashed border-[#1d1e1b] text-xl last:border-none">
+                                                <span className="text-[#c7473d] w-8">#{index + 1}</span>
+                                                <span className="flex-grow text-left pl-2 whitespace-nowrap overflow-hidden text-ellipsis">{entry.name}</span>
+                                                <span className="text-[#fab934] text-stroke-yellow">{entry.score} pts</span>
+                                            </li>
+                                        ))
+                                    )}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
+}
