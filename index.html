@@ -21,9 +21,12 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
+        /* Prevención agresiva de scroll y rebote en móviles */
         body, html {
             margin: 0; padding: 0; background-color: #1d1e1b; overflow: hidden;
-            touch-action: manipulation; user-select: none; -webkit-user-drag: none;
+            width: 100%; height: 100%; position: fixed; inset: 0;
+            touch-action: none; user-select: none; -webkit-user-drag: none;
+            -webkit-overflow-scrolling: auto;
         }
         
         .caprasimo { font-family: 'Caprasimo', serif; }
@@ -105,7 +108,6 @@
 
             // --- EFECTOS E INICIALIZACIÓN ---
             useEffect(() => {
-                // Preloader de assets (Cambio aplicado: fondoregistro1.png)
                 const assetsToLoad = [
                     'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 
                     'logo.png', 'cartel.png', 'registro.png', 
@@ -120,12 +122,10 @@
                     img.onerror = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
                 });
 
-                // Configuración de Audio (referencia persistente)
                 bgMusic.current = new Audio(baseUrl + 'Sugarcup-Shuffle.aac' + rawSuffix);
                 bgMusic.current.loop = true;
                 bgMusic.current.volume = 0.5;
 
-                // Firebase Auth Init
                 if (!auth) return;
                 const initAuth = async () => {
                     try {
@@ -162,7 +162,6 @@
                     
                     setFallingItems(prev => [...prev, newItem]);
                     
-                    // Limpieza de ingredientes que caen para liberar memoria
                     setTimeout(() => {
                         setFallingItems(prev => prev.filter(i => i.id !== newItem.id));
                     }, newItem.duration * 1000);
@@ -192,7 +191,6 @@
                     return;
                 }
 
-                // Estado guardado en ventana para gameloop
                 window.playerData = { name: name.trim(), dni: dni.trim() };
                 
                 setPlayText("CARGANDO...");
@@ -212,7 +210,6 @@
                     let scores = [];
                     snapshot.forEach(doc => scores.push({ id: doc.id, ...doc.data() }));
                     
-                    // Ordenar descendentemente en memoria (Regla Firebase)
                     scores.sort((a, b) => b.score - a.score);
                     setLeaderboard(scores.slice(0, 10));
                 } catch (error) {
@@ -222,19 +219,24 @@
             };
 
             return (
-                <div className="flex justify-center items-center w-full h-screen bg-[#1d1e1b]">
+                // FIX FULLSCREEN: fixed inset-0 w-full h-full previene cualquier posibilidad de scroll
+                <div className="fixed inset-0 flex justify-center items-center bg-[#1d1e1b]">
                     <div className="relative w-full h-full max-w-[500px] bg-[#1d1e1b] overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.8)]">
                         
-                        {/* Overlay Global Texturizado */}
+                        {/* Overlay Global Texturizado FIX: z-9999 absoluto, mixBlendMode directo, opacidad alta */}
                         <div 
-                            className="absolute inset-0 z-[9999] pointer-events-none mix-blend-multiply opacity-60 bg-cover bg-center" 
-                            style={{ backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})` }}
+                            className="absolute inset-0 z-[9999] pointer-events-none bg-cover bg-center" 
+                            style={{ 
+                                backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})`,
+                                mixBlendMode: 'multiply',
+                                opacity: 0.85
+                            }}
                         ></div>
 
                         {/* --- PANTALLA 1: SPLASH --- */}
                         {screen === 'splash' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center bg-cover bg-center cursor-pointer"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[8vh] bg-cover bg-center cursor-pointer"
                                 style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
                                 onClick={handleEnterClick}
                             >
@@ -255,21 +257,21 @@
                                     ))}
                                 </div>
 
-                                {/* Logo Centrado */}
-                                <div className="flex-grow flex items-center justify-center w-full">
-                                    <div className="relative z-[2] w-[90%] max-w-[400px] tipsy pb-[5vh]">
+                                {/* Logo Centrado dinámicamente en el espacio sobrante */}
+                                <div className="flex-grow flex items-center justify-center w-full mt-4">
+                                    <div className="relative z-[2] w-[90%] max-w-[400px] tipsy">
                                         <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
 
                                 {/* Tercio Inferior: Texto y Cartel */}
-                                <div className="flex flex-col items-center w-full z-[2] pb-4">
+                                <div className="flex flex-col items-center w-full z-[2]">
                                     <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest drop-shadow-[0_5px_0_rgba(0,0,0,0.5)] mb-4">
                                         {loaded ? 'ENTRAR' : 'CARGANDO...'}
                                     </div>
 
                                     {/* Cartel Metrónomo */}
-                                    <div className="w-[45%] max-w-[180px] pendulum -mb-[10px]">
+                                    <div className="w-[45%] max-w-[180px] pendulum">
                                         <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
@@ -279,43 +281,47 @@
                         {/* --- PANTALLA 2: REGISTRO --- */}
                         {screen === 'register' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-start pt-[5vh] bg-cover bg-center"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[6vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
-                                <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[60%] max-w-[250px] tipsy mb-[2vh]" />
-                                <img src={`${baseUrl}registro.png${rawSuffix}`} alt="Registro" className="w-[70%] max-w-[280px] tipsy-mild mb-[3vh]" />
+                                {/* Grupo Superior: Logos - Ajustado para no causar overflow */}
+                                <div className="flex flex-col items-center w-full">
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[50%] max-w-[200px] tipsy mb-2" />
+                                    <img src={`${baseUrl}registro.png${rawSuffix}`} alt="Registro" className="w-[60%] max-w-[240px] tipsy-mild" />
+                                </div>
 
-                                <div className="flex flex-col w-[80%] max-w-[320px] gap-3">
+                                {/* Grupo Medio: Formulario */}
+                                <div className="flex flex-col w-[80%] max-w-[320px] gap-2">
                                     <div className="flex flex-col items-center">
-                                        <label className="text-[#fff3e2] text-xl caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
+                                        <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
                                         <input 
                                             type="text" 
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
                                             placeholder={namePlaceholder}
                                             maxLength="15"
-                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-5 py-2 caprasimo text-xl text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50"
+                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50"
                                         />
                                     </div>
                                     <div className="flex flex-col items-center">
-                                        <label className="text-[#fff3e2] text-xl caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
+                                        <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
                                         <input 
                                             type="tel" 
                                             value={dni}
                                             onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} // Solo números
                                             maxLength="12"
-                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-5 py-2 caprasimo text-xl text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]"
+                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]"
                                         />
                                     </div>
                                     
-                                    <div className="flex items-start gap-3 mt-2 px-2">
+                                    <div className="flex items-start gap-2 mt-1 px-1">
                                         <div className="relative flex-shrink-0 cursor-pointer mt-1" onClick={() => setTyc(!tyc)}>
-                                            <div className="w-6 h-6 bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded flex items-center justify-center">
-                                                {tyc && <span className="text-[#1d1e1b] caprasimo text-lg leading-none mt-1">X</span>}
+                                            <div className="w-5 h-5 bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded flex items-center justify-center">
+                                                {tyc && <span className="text-[#1d1e1b] caprasimo text-sm leading-none mt-1">X</span>}
                                             </div>
                                         </div>
                                         <div 
-                                            className={`text-xs leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`}
+                                            className={`text-[0.7rem] leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`}
                                             onClick={() => setShowTyc(true)}
                                         >
                                             Acepto los términos y condiciones y el tratamiento opcional de datos.
@@ -323,16 +329,17 @@
                                     </div>
                                 </div>
 
-                                <div className="mt-auto mb-[5vh] flex flex-col items-center gap-4 w-full">
+                                {/* Grupo Inferior: Botones */}
+                                <div className="flex flex-col items-center gap-3 w-full">
                                     <button 
                                         onClick={handlePlayClick}
-                                        className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-4xl btn-shadow"
+                                        className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow"
                                     >
                                         {playText}
                                     </button>
                                     <button 
                                         onClick={fetchLeaderboard}
-                                        className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-xl btn-shadow-small tipsy-mild"
+                                        className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-lg btn-shadow-small tipsy-mild"
                                     >
                                         RANKING
                                     </button>
@@ -350,8 +357,8 @@
                                     >
                                         X
                                     </button>
-                                    <h2 className="text-[#1d1e1b] text-center text-2xl caprasimo mb-4 mt-0">Términos y Condiciones</h2>
-                                    <div className="overflow-y-auto flex-grow font-sans text-[0.9rem] text-[#1d1e1b] leading-relaxed pr-2 retro-scroll">
+                                    <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-3 mt-0">Términos y Condiciones</h2>
+                                    <div className="overflow-y-auto flex-grow font-sans text-[0.85rem] text-[#1d1e1b] leading-relaxed pr-2 retro-scroll">
                                         <p className="mb-2"><strong>1. Aceptación:</strong> Al participar en BURGER SMASH, aceptas estos términos y condiciones para el evento Burgerfest 2026.</p>
                                         <p className="mb-2"><strong>2. Uso de datos:</strong> Autorizas a Burgerboy a recopilar tu Nombre y DNI/CE con el único fin de identificarte en la tabla de clasificación y contactarte.</p>
                                         <p className="mb-2"><strong>3. Mecánica:</strong> El juego es de habilidad. Las puntuaciones se guardan automáticamente con conexión a internet.</p>
@@ -372,16 +379,16 @@
                                     >
                                         X
                                     </button>
-                                    <h2 className="text-[#1d1e1b] text-center text-2xl caprasimo mb-4 mt-0">TOP 10 SMASHERS</h2>
+                                    <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-4 mt-0">TOP 10 SMASHERS</h2>
                                     <div className="overflow-y-auto flex-grow pr-2 retro-scroll">
-                                        <ul className="list-none p-0 m-0 caprasimo">
+                                        <ul className="list-none p-0 m-0 caprasimo text-lg">
                                             {loadingRanking ? (
-                                                <li className="text-center font-sans text-lg">Cargando data...</li>
+                                                <li className="text-center font-sans text-base">Cargando data...</li>
                                             ) : leaderboard.length === 0 ? (
-                                                <li className="text-center font-sans text-lg">¡Aún no hay puntuaciones! Sé el primero.</li>
+                                                <li className="text-center font-sans text-base">¡Aún no hay puntuaciones! Sé el primero.</li>
                                             ) : (
                                                 leaderboard.map((entry, index) => (
-                                                    <li key={entry.id} className="flex justify-between py-2 border-b-2 border-dashed border-[#1d1e1b] text-xl last:border-none">
+                                                    <li key={entry.id} className="flex justify-between py-2 border-b-2 border-dashed border-[#1d1e1b] last:border-none">
                                                         <span className="text-[#c7473d] w-8">#{index + 1}</span>
                                                         <span className="flex-grow text-left pl-2 whitespace-nowrap overflow-hidden text-ellipsis">{entry.name}</span>
                                                         <span className="text-[#fab934] text-stroke-yellow">{entry.score} pts</span>
