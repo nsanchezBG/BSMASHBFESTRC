@@ -264,16 +264,14 @@
                                     </div>
                                 </div>
 
-                                {/* Tercio Inferior: Texto y Cartel */}
-                                <div className="flex flex-col items-center w-full z-[2]">
-                                    <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest drop-shadow-[0_5px_0_rgba(0,0,0,0.5)] mb-6">
-                                        {loaded ? 'ENTRAR' : 'CARGANDO...'}
-                                    </div>
+                                {/* Texto ENTRAR - Se ubica a media distancia gracias al margen inferior */}
+                                <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest z-[2] mb-[8vh]">
+                                    {loaded ? 'ENTRAR' : 'CARGANDO...'}
+                                </div>
 
-                                    {/* Cartel Metrónomo - Con margen negativo para ocular el corte inferior */}
-                                    <div className="w-[45%] max-w-[180px] pendulum -mb-[5%]">
-                                        <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
-                                    </div>
+                                {/* Cartel Metrónomo - Con margen negativo para ocular el corte inferior */}
+                                <div className="w-[45%] max-w-[180px] pendulum z-[2] -mb-[5%]">
+                                    <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
                                 </div>
                             </div>
                         )}
