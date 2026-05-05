@@ -236,7 +236,7 @@
                         {/* --- PANTALLA 1: SPLASH --- */}
                         {screen === 'splash' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[8vh] bg-cover bg-center cursor-pointer"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[10vh] bg-cover bg-center cursor-pointer"
                                 style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
                                 onClick={handleEnterClick}
                             >
@@ -266,12 +266,12 @@
 
                                 {/* Tercio Inferior: Texto y Cartel */}
                                 <div className="flex flex-col items-center w-full z-[2]">
-                                    <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest drop-shadow-[0_5px_0_rgba(0,0,0,0.5)] mb-4">
+                                    <div className="text-[#fff3e2] text-2xl caprasimo uppercase text-stroke pulse tracking-widest drop-shadow-[0_5px_0_rgba(0,0,0,0.5)] mb-6">
                                         {loaded ? 'ENTRAR' : 'CARGANDO...'}
                                     </div>
 
-                                    {/* Cartel Metrónomo */}
-                                    <div className="w-[45%] max-w-[180px] pendulum">
+                                    {/* Cartel Metrónomo - Con margen negativo para ocular el corte inferior */}
+                                    <div className="w-[45%] max-w-[180px] pendulum -mb-[5%]">
                                         <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
@@ -281,7 +281,7 @@
                         {/* --- PANTALLA 2: REGISTRO --- */}
                         {screen === 'register' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[6vh] bg-cover bg-center"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[8vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
                                 {/* Grupo Superior: Logos - Ajustado para no causar overflow */}
@@ -329,8 +329,8 @@
                                     </div>
                                 </div>
 
-                                {/* Grupo Inferior: Botones */}
-                                <div className="flex flex-col items-center gap-3 w-full">
+                                {/* Grupo Inferior: Botones - Espaciado (gap) incrementado a gap-6 */}
+                                <div className="flex flex-col items-center gap-6 w-full">
                                     <button 
                                         onClick={handlePlayClick}
                                         className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow"
