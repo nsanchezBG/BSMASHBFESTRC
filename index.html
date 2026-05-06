@@ -38,7 +38,8 @@
         .pulse { animation: pulse 1.5s infinite; }
         .pendulum { transform-origin: bottom center; animation: pendulum 2s ease-in-out infinite alternate; }
         .falling-ingredient { animation: fallAndSpin linear forwards; }
-        .bg-pan { animation: panBackground 20s ease-in-out infinite; background-size: auto 100%; }
+        /* Velocidad reducida al 10% (de 20s a 200s) */
+        .bg-pan { animation: panBackground 200s ease-in-out infinite; background-size: auto 100%; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -372,14 +373,19 @@
                                     <img src={`${baseUrl}tutorial.png${rawSuffix}`} alt="Tutorial" className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
                                 </div>
 
-                                {/* Píldora 1 */}
-                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-lg text-stroke-small shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                {/* Píldora 1 - Sin borde negro y fuente grande */}
+                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
                                     ¡Smashea las burgers!
                                 </div>
 
                                 {/* Animación de la mano Smashing */}
                                 <div className="relative w-32 h-32 flex items-center justify-center my-4">
-                                    <img src={`${baseUrl}carne.png${rawSuffix}`} alt="Carne" className="w-16 h-16 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b]" />
+                                    {/* Carne reducida a w-12 h-12 y desplazada a la parte superior derecha de la espátula */}
+                                    <img 
+                                        src={`${baseUrl}carne.png${rawSuffix}`} 
+                                        alt="Carne" 
+                                        className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" 
+                                    />
                                     {/* Cambiamos la imagen según el frame */}
                                     <img 
                                         src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} 
@@ -389,8 +395,8 @@
                                     />
                                 </div>
 
-                                {/* Píldora 2 */}
-                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.05rem] text-stroke-small shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                {/* Píldora 2 - Sin borde negro y fuente grande */}
+                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
                                     ¡No golpees los vegetales!
                                 </div>
 
