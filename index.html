@@ -145,6 +145,7 @@
             const bgMusic = useRef(null);
             const burgerfestTimerRef = useRef(null);
             const sfxCache = useRef({});
+            const audioCtxRef = useRef(null); // Ref para la Web Audio API
 
             // Modales
             const [showTyc, setShowTyc] = useState(false);
@@ -155,13 +156,28 @@
             const baseUrl = 'https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/';
             const rawSuffix = '?raw=true';
 
-            // --- REPRODUCTOR DE SFX ---
+            // --- REPRODUCTOR DE SFX (Web Audio API - Latencia Cero) ---
             const playSound = useCallback((soundName) => {
-                if (sfxCache.current[soundName]) {
-                    // Clonamos el nodo para poder reproducir sonidos superpuestos (como varios smashes rápidos)
-                    const clone = sfxCache.current[soundName].cloneNode(true);
-                    clone.volume = 0.8;
-                    clone.play().catch(e => console.log("SFX error:", e));
+                const ctx = audioCtxRef.current;
+                const buffer = sfxCache.current[soundName];
+                
+                if (ctx && buffer) {
+                    // Resume del contexto si el navegador lo suspendió (común en iOS/Android)
+                    if (ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+                    // Crear el reproductor del buffer
+                    const source = ctx.createBufferSource();
+                    source.buffer = buffer;
+                    
+                    // Control de volumen
+                    const gainNode = ctx.createGain();
+                    gainNode.gain.value = 0.8;
+                    
+                    // Conectar y reproducir instantáneamente
+                    source.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    source.start(0);
                 }
             }, []);
 
@@ -183,18 +199,29 @@
                     img.onerror = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
                 });
 
-                // Carga de Audio de Fondo
+                // Carga de Audio de Fondo (Este se mantiene normal porque no requiere solapamiento rápido)
                 bgMusic.current = new Audio(baseUrl + 'Sugarcup-Shuffle.aac' + rawSuffix);
                 bgMusic.current.loop = true;
                 bgMusic.current.volume = 0.5;
 
-                // Carga de SFX en Caché
-                const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
-                sfxList.forEach(s => {
-                    const audio = new Audio(baseUrl + s + rawSuffix);
-                    audio.load();
-                    sfxCache.current[s] = audio;
-                });
+                // Inicializar Web Audio API para SFX sin latencia
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtxRef.current = new AudioContext();
+
+                const loadSFX = async () => {
+                    const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
+                    for (const s of sfxList) {
+                        try {
+                            const response = await fetch(baseUrl + s + rawSuffix);
+                            const arrayBuffer = await response.arrayBuffer();
+                            const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
+                            sfxCache.current[s] = audioBuffer;
+                        } catch (err) {
+                            console.error("Error decodificando audio", s, err);
+                        }
+                    }
+                };
+                loadSFX();
 
                 if (!auth) return;
                 const initAuth = async () => {
@@ -439,6 +466,10 @@
             // --- NAVEGACIÓN BÁSICA ---
             const handleEnterClick = () => {
                 if (!loaded) return;
+                // Reactivamos el audio context por políticas de usuario en iOS/Android
+                if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                    audioCtxRef.current.resume();
+                }
                 playSound('botones.mp3');
                 bgMusic.current?.play().catch(e => console.log("Audio bloqueado:", e));
                 setScreen('register');
