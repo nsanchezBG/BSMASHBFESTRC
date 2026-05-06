@@ -45,6 +45,7 @@
         .float-up { animation: floatUp 2s ease-out forwards; }
         .pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .flash-red { animation: flashRed 0.3s ease-out forwards; }
+        .flash-gold { animation: flashGoldLoop 0.3s ease-in-out infinite alternate; }
         .fade-out-burger { animation: fadeOutBurger 2s ease-out forwards; }
         .pop-in-fade { animation: popInFade 2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
@@ -70,6 +71,7 @@
         @keyframes floatUp { 0% { transform: translateY(0) scale(0.8); opacity: 1; } 100% { transform: translateY(-80px) scale(1.2); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes flashRed { 0% { background-color: rgba(199, 71, 61, 0.6); } 100% { background-color: rgba(199, 71, 61, 0); } }
+        @keyframes flashGoldLoop { 0% { background-color: rgba(250, 185, 52, 0); } 100% { background-color: rgba(250, 185, 52, 0.3); } }
         @keyframes fadeOutBurger { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
         @keyframes popInFade { 
             0% { transform: scale(0); opacity: 0; } 
@@ -128,6 +130,7 @@
             const [smashes, setSmashes] = useState([]);
             const [burgers, setBurgers] = useState([]);
             const [flashRed, setFlashRed] = useState(false);
+            const [isBurgerfest, setIsBurgerfest] = useState(false);
             
             // Render states (linked to refs para performance en tiempo real)
             const [renderScore, setRenderScore] = useState(0);
@@ -140,6 +143,7 @@
             const livesRef = useRef(3);
             const planchaRef = useRef(null);
             const bgMusic = useRef(null);
+            const burgerfestTimerRef = useRef(null);
 
             // Modales
             const [showTyc, setShowTyc] = useState(false);
@@ -156,7 +160,7 @@
                     'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 'fondojuego.png',
                     'logo.png', 'cartel.png', 'registro.png', 'tutorial.png',
                     'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'mano1.png', 'mano2.png',
-                    'corazon.png', 'plancha.png', 'burger.png', 'humo.png'
+                    'corazon.png', 'plancha.png', 'burger.png', 'humo.png', 'burgerboy.png'
                 ];
                 
                 let loadedCount = 0;
@@ -223,6 +227,8 @@
                 setActiveIngredients([]);
                 setSmashes([]);
                 setBurgers([]);
+                setIsBurgerfest(false);
+                if(burgerfestTimerRef.current) clearTimeout(burgerfestTimerRef.current);
                 
                 scoreRef.current = 0;
                 comboRef.current = 0;
@@ -247,30 +253,55 @@
                 }
             }, [screen, gameStatus, countdownVal]);
 
-            // Spawner de ingredientes
+            // Spawner de ingredientes dinámico
             useEffect(() => {
                 if (screen === 'game' && gameStatus === 'playing') {
                     const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
-                    // Spawneamos más rápido para darle dinamismo al juego (cada 600ms)
+                    
+                    // Intervalo normal: 600ms. En Burgerfest: 200ms
+                    const intervalTime = isBurgerfest ? 200 : 600;
+
                     const interval = setInterval(() => {
+                        let typeToSpawn;
+                        let duration;
+
+                        if (isBurgerfest) {
+                            // Lluvia masiva de puras carnes
+                            typeToSpawn = 'carne.png';
+                            duration = Math.random() * 1.5 + 1.5; 
+                        } else {
+                            // Probabilidad del 1% para Burgerboy (ingrediente dorado)
+                            const roll = Math.random();
+                            if (roll < 0.01) {
+                                typeToSpawn = 'burgerboy.png';
+                                duration = Math.random() * 1.0 + 1.0; // Cae extremadamente rápido
+                            } else {
+                                typeToSpawn = types[Math.floor(Math.random() * types.length)];
+                                duration = Math.random() * 1.5 + 2; 
+                            }
+                        }
+
                         const newItem = {
                             id: Math.random().toString(36).substr(2, 9),
-                            type: types[Math.floor(Math.random() * types.length)],
-                            left: Math.random() * 80 + 10, // 10vw to 90vw
-                            duration: Math.random() * 1.5 + 2 // 2s to 3.5s fall speed
+                            type: typeToSpawn,
+                            left: Math.random() * 80 + 10,
+                            duration: duration
                         };
+                        
                         setActiveIngredients(prev => [...prev, newItem]);
                         setTimeout(() => {
                             setActiveIngredients(prev => prev.filter(i => i.id !== newItem.id));
                         }, newItem.duration * 1000);
-                    }, 600);
+                    }, intervalTime);
+                    
                     return () => clearInterval(interval);
                 }
-            }, [screen, gameStatus]);
+            }, [screen, gameStatus, isBurgerfest]);
 
             // Fin del Juego y Guardado en Firebase
             const handleGameOver = async () => {
                 setGameStatus('gameover');
+                setIsBurgerfest(false);
                 if (scoreRef.current > 0 && user && db && window.playerData) {
                     try {
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'), {
@@ -316,22 +347,40 @@
                     const id = hitItem.dataset.id;
                     const type = hitItem.dataset.type;
 
-                    // Desaparecer ingrediente de la UI
+                    // Desaparecer ingrediente golpeado de la UI
                     setActiveIngredients(prev => prev.filter(ing => ing.id !== id));
 
-                    if (type === 'carne.png') {
-                        // HIT EXITOSO
-                        const currentMultiplier = comboRef.current === 0 ? 1 : comboRef.current + 1;
-                        const pointsEarned = 10 * currentMultiplier;
+                    if (type === 'carne.png' || type === 'burgerboy.png') {
+                        // HIT EXITOSO (Carne o Burgerboy)
+                        let currentMultiplier = comboRef.current === 0 ? 1 : comboRef.current + 1;
+                        if (currentMultiplier > 10) currentMultiplier = 10; // Tope máximo del combo x10
+                        
+                        const basePoints = type === 'burgerboy.png' ? 50 : 10; // Burgerboy da muchos más puntos base
+                        const pointsEarned = basePoints * currentMultiplier;
                         
                         scoreRef.current += pointsEarned;
                         comboRef.current = currentMultiplier;
                         setRenderScore(scoreRef.current);
                         setRenderCombo(comboRef.current);
 
-                        // Popup Burger y humo
+                        // Si tocamos a Burgerboy, ¡Inicia la locura dorada!
+                        if (type === 'burgerboy.png') {
+                            setIsBurgerfest(true);
+                            if(burgerfestTimerRef.current) clearTimeout(burgerfestTimerRef.current);
+                            burgerfestTimerRef.current = setTimeout(() => {
+                                setIsBurgerfest(false);
+                            }, 5000);
+                        }
+
+                        // Calcular posición segura para que el texto NO se salga de la pantalla
+                        const safeTextX = Math.max(80, Math.min(clientX, window.innerWidth - 80));
+                        const hitRect = hitItem.getBoundingClientRect();
+                        const burgerX = hitRect.left + 28; // Centro relativo al ingrediente
+                        const burgerY = hitRect.top + 28;
+
+                        // Popup Burger y humo (El texto irá amarrado a safeTextX)
                         const bId = Date.now().toString();
-                        setBurgers(prev => [...prev, { id: bId, x: hitItem.getBoundingClientRect().left + 28, y: hitItem.getBoundingClientRect().top + 28, points: pointsEarned }]);
+                        setBurgers(prev => [...prev, { id: bId, x: burgerX, y: burgerY, textX: safeTextX, points: pointsEarned }]);
                         setTimeout(() => { setBurgers(prev => prev.filter(b => b.id !== bId)); }, 2000);
 
                     } else {
@@ -349,6 +398,10 @@
                             handleGameOver();
                         }
                     }
+                } else {
+                    // Si golpea un área vacía de la plancha, resetea el combo sin quitar vida
+                    comboRef.current = 0;
+                    setRenderCombo(0);
                 }
             }, [gameStatus]);
 
@@ -497,6 +550,18 @@
                                 {/* Flash Rojo de daño */}
                                 {flashRed && <div className="absolute inset-0 z-[60] flash-red pointer-events-none"></div>}
 
+                                {/* Flash Dorado de Burgerfest */}
+                                {isBurgerfest && <div className="absolute inset-0 z-[60] flash-gold pointer-events-none"></div>}
+
+                                {/* Texto Overlay Gigante ¡BURGERFEST! */}
+                                {isBurgerfest && gameStatus === 'playing' && (
+                                    <div className="absolute inset-0 z-[70] flex items-center justify-center pointer-events-none">
+                                        <span className="caprasimo text-5xl md:text-6xl text-[#fab934] text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in pulse">
+                                            ¡BURGERFEST!
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Capa 4: HUD */}
                                 {gameStatus !== 'gameover' && (
                                     <div className="absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-10 px-2 pointer-events-none">
@@ -531,15 +596,27 @@
                                 {gameStatus === 'playing' && (
                                     <div className="absolute inset-0 overflow-hidden z-[30] pointer-events-none">
                                         {activeIngredients.map(ing => (
-                                            <img 
+                                            <div 
                                                 key={ing.id} 
                                                 data-ingredient="true" 
                                                 data-id={ing.id} 
                                                 data-type={ing.type}
-                                                src={`${baseUrl}${ing.type}${rawSuffix}`} 
-                                                className="absolute falling-game w-14 h-14 drop-shadow-[0_5px_0_#1d1e1b] pointer-events-auto" 
-                                                style={{ left: `${ing.left}vw`, animationDuration: `${ing.duration}s` }} 
-                                            />
+                                                className="absolute falling-game flex justify-center items-center pointer-events-auto" 
+                                                style={{ left: `${ing.left}vw`, animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
+                                            >
+                                                {/* El ingrediente */}
+                                                <img src={`${baseUrl}${ing.type}${rawSuffix}`} className="w-full h-full drop-shadow-[0_5px_0_#1d1e1b] pointer-events-none" />
+                                                
+                                                {/* Efecto exclusivo de Burgerboy (partículas doradas) */}
+                                                {ing.type === 'burgerboy.png' && (
+                                                    <div className="absolute inset-0 pointer-events-none overflow-visible">
+                                                        <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-0 left-0 animate-ping shadow-[0_0_8px_#fab934]"></span>
+                                                        <span className="absolute w-1.5 h-1.5 bg-[#fff3e2] rounded-full bottom-0 right-0 animate-ping shadow-[0_0_8px_#fff3e2]" style={{animationDelay: '0.2s'}}></span>
+                                                        <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-1/2 -right-2 animate-pulse shadow-[0_0_8px_#fab934]"></span>
+                                                        <span className="absolute w-2 h-2 bg-[#fff3e2] rounded-full -bottom-2 left-1/2 animate-bounce shadow-[0_0_8px_#fff3e2]"></span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         ))}
                                     </div>
                                 )}
@@ -548,16 +625,19 @@
                                 <div className="absolute inset-0 z-[40] pointer-events-none">
                                     {/* Hamburguesas Smasheadas y Humo */}
                                     {burgers.map(b => (
-                                        <div key={b.id} className="absolute flex flex-col items-center" style={{ left: b.x - 30, top: b.y - 30 }}>
-                                            <img src={`${baseUrl}humo.png${rawSuffix}`} className="w-10 h-10 float-up absolute bottom-8 z-[2]" />
-                                            {/* Burger respetando proporción y con desvanecimiento */}
-                                            <img src={`${baseUrl}burger.png${rawSuffix}`} className="h-14 w-auto z-[3] drop-shadow-[0_4px_0_#1d1e1b] fade-out-burger" />
-                                            {/* Textos de SMASH más grandes y por encima (z-10) con desvanecimiento */}
-                                            <div className="absolute -top-16 flex flex-col items-center pop-in-fade z-[10]">
+                                        <React.Fragment key={b.id}>
+                                            {/* Contenedor de la Burger y Humo - Dejamos que la imagen flex-shrink-0 y max-w-none sobresalga de la pantalla */}
+                                            <div className="absolute flex flex-col items-center" style={{ left: b.x - 30, top: b.y - 30 }}>
+                                                <img src={`${baseUrl}humo.png${rawSuffix}`} className="w-10 h-10 float-up absolute bottom-8 max-w-none flex-shrink-0 z-[2]" />
+                                                <img src={`${baseUrl}burger.png${rawSuffix}`} className="h-14 w-auto max-w-none flex-shrink-0 z-[3] drop-shadow-[0_4px_0_#1d1e1b] fade-out-burger" />
+                                            </div>
+
+                                            {/* Textos de SMASH - Amarrados al textX calculado para NO salir de la pantalla */}
+                                            <div className="absolute flex flex-col items-center pop-in-fade z-[10]" style={{ left: b.textX, top: b.y - 80, transform: 'translateX(-50%)' }}>
                                                 <span className="caprasimo text-4xl text-[#fff3e2] text-stroke">¡SMASH!</span>
                                                 <span className="caprasimo text-3xl text-[#fab934] text-stroke-small">+{b.points}</span>
                                             </div>
-                                        </div>
+                                        </React.Fragment>
                                     ))}
                                     
                                     {/* Mano de Smash (Frames) */}
