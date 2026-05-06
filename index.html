@@ -38,6 +38,7 @@
         .pulse { animation: pulse 1.5s infinite; }
         .pendulum { transform-origin: bottom center; animation: pendulum 2s ease-in-out infinite alternate; }
         .falling-ingredient { animation: fallAndSpin linear forwards; }
+        .bg-pan { animation: panBackground 20s ease-in-out infinite; background-size: auto 100%; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -56,6 +57,7 @@
         @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
         @keyframes pendulum { 0% { transform: rotate(-8deg); } 100% { transform: rotate(8deg); } }
         @keyframes fallAndSpin { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(120vh) rotate(360deg); } }
+        @keyframes panBackground { 0% { background-position: 0% center; } 50% { background-position: 100% center; } 100% { background-position: 0% center; } }
 
         /* Scrollbar retro para modal */
         .retro-scroll::-webkit-scrollbar { width: 8px; }
@@ -96,6 +98,9 @@
             const [tycError, setTycError] = useState(false);
             const [playText, setPlayText] = useState('JUGAR');
 
+            // Tutorial
+            const [handFrame, setHandFrame] = useState(1);
+
             // Modales
             const [showTyc, setShowTyc] = useState(false);
             const [showRanking, setShowRanking] = useState(false);
@@ -109,9 +114,9 @@
             // --- EFECTOS E INICIALIZACIÓN ---
             useEffect(() => {
                 const assetsToLoad = [
-                    'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 
-                    'logo.png', 'cartel.png', 'registro.png', 
-                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png'
+                    'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 'fondojuego.png',
+                    'logo.png', 'cartel.png', 'registro.png', 'tutorial.png',
+                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'mano1.png', 'mano2.png'
                 ];
                 
                 let loadedCount = 0;
@@ -146,7 +151,7 @@
                 };
             }, []);
 
-            // Lluvia de ingredientes
+            // Lluvia de ingredientes (sólo en splash)
             useEffect(() => {
                 if (screen !== 'splash' || !loaded) return;
                 const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
@@ -170,6 +175,17 @@
 
                 return () => clearInterval(interval);
             }, [screen, loaded]);
+
+            // Loop de animación de la mano (Tutorial)
+            useEffect(() => {
+                let interval;
+                if (screen === 'tutorial') {
+                    interval = setInterval(() => {
+                        setHandFrame(prev => prev === 1 ? 2 : 1);
+                    }, 250); // Cambia de frame cada 250ms
+                }
+                return () => clearInterval(interval);
+            }, [screen]);
 
             // --- ACCIONES ---
             const handleEnterClick = () => {
@@ -196,7 +212,7 @@
                 setPlayText("CARGANDO...");
                 setTimeout(() => {
                     setPlayText("JUGAR");
-                    console.log("Transición a tutorial lista. (Siguiente iteración)");
+                    setScreen('tutorial'); // Transición al tutorial
                 }, 1000);
             };
 
@@ -219,7 +235,6 @@
             };
 
             return (
-                // FIX FULLSCREEN: fixed inset-0 w-full h-full previene cualquier posibilidad de scroll
                 <div className="fixed inset-0 flex justify-center items-center bg-[#1d1e1b]">
                     <div className="relative w-full h-full max-w-[500px] bg-[#1d1e1b] overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.8)]">
                         
@@ -282,7 +297,7 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[8vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
-                                {/* Grupo Superior: Logos - Ajustado para no causar overflow */}
+                                {/* Grupo Superior: Logos */}
                                 <div className="flex flex-col items-center w-full">
                                     <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[50%] max-w-[200px] tipsy mb-2" />
                                     <img src={`${baseUrl}registro.png${rawSuffix}`} alt="Registro" className="w-[60%] max-w-[240px] tipsy-mild" />
@@ -306,7 +321,7 @@
                                         <input 
                                             type="tel" 
                                             value={dni}
-                                            onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} // Solo números
+                                            onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))}
                                             maxLength="12"
                                             className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]"
                                         />
@@ -327,7 +342,7 @@
                                     </div>
                                 </div>
 
-                                {/* Grupo Inferior: Botones - Espaciado (gap) incrementado a gap-6 */}
+                                {/* Grupo Inferior: Botones */}
                                 <div className="flex flex-col items-center gap-6 w-full">
                                     <button 
                                         onClick={handlePlayClick}
@@ -342,6 +357,70 @@
                                         RANKING
                                     </button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* --- PANTALLA 3: TUTORIAL --- */}
+                        {screen === 'tutorial' && (
+                            <div 
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[5vh] bg-pan"
+                                style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}
+                            >
+                                {/* Logos */}
+                                <div className="flex flex-col items-center w-full">
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[45%] max-w-[180px] tipsy mb-2" />
+                                    <img src={`${baseUrl}tutorial.png${rawSuffix}`} alt="Tutorial" className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
+                                </div>
+
+                                {/* Píldora 1 */}
+                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-lg text-stroke-small shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                    ¡Smashea las burgers!
+                                </div>
+
+                                {/* Animación de la mano Smashing */}
+                                <div className="relative w-32 h-32 flex items-center justify-center my-4">
+                                    <img src={`${baseUrl}carne.png${rawSuffix}`} alt="Carne" className="w-16 h-16 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b]" />
+                                    {/* Cambiamos la imagen según el frame */}
+                                    <img 
+                                        src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} 
+                                        alt="Mano" 
+                                        className={`absolute z-[2] ${handFrame === 1 ? 'w-24 h-24 -translate-y-6 translate-x-4' : 'w-28 h-28 -translate-y-2 translate-x-2'}`}
+                                        style={{ transition: 'none' }} 
+                                    />
+                                </div>
+
+                                {/* Píldora 2 */}
+                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.05rem] text-stroke-small shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                    ¡No golpees los vegetales!
+                                </div>
+
+                                {/* Vegetales */}
+                                <div className="flex gap-4 my-4">
+                                    <img src={`${baseUrl}tomate.png${rawSuffix}`} alt="Tomate" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
+                                    <img src={`${baseUrl}lechuga.png${rawSuffix}`} alt="Lechuga" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
+                                    <img src={`${baseUrl}papas.png${rawSuffix}`} alt="Papas" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                </div>
+
+                                {/* Botón OK */}
+                                <button 
+                                    onClick={() => setScreen('game')}
+                                    className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2"
+                                >
+                                    OK
+                                </button>
+                            </div>
+                        )}
+
+                        {/* --- PANTALLA TEMPORAL: JUEGO (Próximo Paso) --- */}
+                        {screen === 'game' && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1d1e1b]">
+                                <h1 className="text-[#fff3e2] caprasimo text-2xl text-center px-4">GAMELOOP EN CONSTRUCCIÓN</h1>
+                                <button 
+                                    onClick={() => setScreen('splash')}
+                                    className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-2 px-6 caprasimo text-xl btn-shadow-small mt-6"
+                                >
+                                    Volver al Inicio
+                                </button>
                             </div>
                         )}
 
