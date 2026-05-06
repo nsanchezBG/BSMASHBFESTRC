@@ -45,6 +45,8 @@
         .float-up { animation: floatUp 2s ease-out forwards; }
         .pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .flash-red { animation: flashRed 0.3s ease-out forwards; }
+        .fade-out-burger { animation: fadeOutBurger 2s ease-out forwards; }
+        .pop-in-fade { animation: popInFade 2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -68,6 +70,14 @@
         @keyframes floatUp { 0% { transform: translateY(0) scale(0.8); opacity: 1; } 100% { transform: translateY(-80px) scale(1.2); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes flashRed { 0% { background-color: rgba(199, 71, 61, 0.6); } 100% { background-color: rgba(199, 71, 61, 0); } }
+        @keyframes fadeOutBurger { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes popInFade { 
+            0% { transform: scale(0); opacity: 0; } 
+            10% { transform: scale(1.1); opacity: 1; } 
+            15% { transform: scale(1); opacity: 1; } 
+            80% { transform: scale(1); opacity: 1; } 
+            100% { transform: scale(1); opacity: 0; } 
+        }
 
         /* Scrollbar retro para modal */
         .retro-scroll::-webkit-scrollbar { width: 8px; }
@@ -489,7 +499,7 @@
 
                                 {/* Capa 4: HUD */}
                                 {gameStatus !== 'gameover' && (
-                                    <div className="absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-4 px-2 pointer-events-none">
+                                    <div className="absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-10 px-2 pointer-events-none">
                                         <div className="relative w-full max-w-[450px] h-[65px] bg-[#fab934] border-[4px] border-[#1d1e1b] rounded-[35px] flex justify-between items-center px-4 shadow-[0_5px_0_#1d1e1b]">
                                             {/* Puntos */}
                                             <div className="bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-[15px] px-3 py-1 flex flex-col items-center justify-center min-w-[80px]">
@@ -502,10 +512,10 @@
                                                 <span className="text-[#c7473d] text-xl caprasimo leading-none">{renderCombo === 0 ? '-' : `x${renderCombo}`}</span>
                                             </div>
                                             {/* Logo Overlap */}
-                                            <img src={`${baseUrl}logo.png${rawSuffix}`} className="absolute left-1/2 -translate-x-1/2 w-[160px] -top-3 drop-shadow-[0_4px_0_#1d1e1b]" />
+                                            <img src={`${baseUrl}logo.png${rawSuffix}`} className="absolute left-1/2 -translate-x-1/2 w-[180px] -top-10 drop-shadow-[0_4px_0_#1d1e1b] z-[60]" />
                                         </div>
                                         {/* Corazones (Vidas) */}
-                                        <div className="flex gap-2 mt-2">
+                                        <div className="flex gap-2 mt-6 z-[60]">
                                             {[1, 2, 3].map(i => (
                                                 <img 
                                                     key={i} 
@@ -540,10 +550,12 @@
                                     {burgers.map(b => (
                                         <div key={b.id} className="absolute flex flex-col items-center" style={{ left: b.x - 30, top: b.y - 30 }}>
                                             <img src={`${baseUrl}humo.png${rawSuffix}`} className="w-10 h-10 float-up absolute bottom-8 z-[2]" />
-                                            <img src={`${baseUrl}burger.png${rawSuffix}`} className="w-16 h-12 z-[1] drop-shadow-[0_4px_0_#1d1e1b]" />
-                                            <div className="absolute -top-12 flex flex-col items-center pop-in">
-                                                <span className="caprasimo text-2xl text-[#fff3e2] text-stroke">¡SMASH!</span>
-                                                <span className="caprasimo text-xl text-[#fab934] text-stroke-small">+{b.points}</span>
+                                            {/* Burger respetando proporción y con desvanecimiento */}
+                                            <img src={`${baseUrl}burger.png${rawSuffix}`} className="h-14 w-auto z-[3] drop-shadow-[0_4px_0_#1d1e1b] fade-out-burger" />
+                                            {/* Textos de SMASH más grandes y por encima (z-10) con desvanecimiento */}
+                                            <div className="absolute -top-16 flex flex-col items-center pop-in-fade z-[10]">
+                                                <span className="caprasimo text-4xl text-[#fff3e2] text-stroke">¡SMASH!</span>
+                                                <span className="caprasimo text-3xl text-[#fab934] text-stroke-small">+{b.points}</span>
                                             </div>
                                         </div>
                                     ))}
