@@ -32,14 +32,19 @@
         .caprasimo { font-family: 'Caprasimo', serif; }
         .font-sans { font-family: sans-serif; }
         
-        /* Animaciones */
+        /* Animaciones Base */
         .tipsy { animation: tipsy 3s ease-in-out infinite alternate; }
         .tipsy-mild { animation: tipsy-mild 4s ease-in-out infinite alternate; }
         .pulse { animation: pulse 1.5s infinite; }
         .pendulum { transform-origin: bottom center; animation: pendulum 2s ease-in-out infinite alternate; }
-        .falling-ingredient { animation: fallAndSpin linear forwards; }
-        /* Velocidad reducida al 10% (de 20s a 200s) */
         .bg-pan { animation: panBackground 200s ease-in-out infinite; background-size: auto 100%; }
+        
+        /* Animaciones Gameloop */
+        .falling-ingredient { animation: fallAndSpin linear forwards; }
+        .falling-game { animation: fallStraight linear forwards; }
+        .float-up { animation: floatUp 2s ease-out forwards; }
+        .pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .flash-red { animation: flashRed 0.3s ease-out forwards; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -58,7 +63,11 @@
         @keyframes pulse { 0% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.8; } }
         @keyframes pendulum { 0% { transform: rotate(-8deg); } 100% { transform: rotate(8deg); } }
         @keyframes fallAndSpin { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(120vh) rotate(360deg); } }
+        @keyframes fallStraight { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(100vh) rotate(180deg); } }
         @keyframes panBackground { 0% { background-position: 0% center; } 50% { background-position: 100% center; } 100% { background-position: 0% center; } }
+        @keyframes floatUp { 0% { transform: translateY(0) scale(0.8); opacity: 1; } 100% { transform: translateY(-80px) scale(1.2); opacity: 0; } }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes flashRed { 0% { background-color: rgba(199, 71, 61, 0.6); } 100% { background-color: rgba(199, 71, 61, 0); } }
 
         /* Scrollbar retro para modal */
         .retro-scroll::-webkit-scrollbar { width: 8px; }
@@ -73,9 +82,9 @@
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURACIÓN DE FIREBASE ---
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -85,13 +94,13 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'burger-smash-2026';
 
         function App() {
-            // --- ESTADOS ---
+            // --- ESTADOS GLOBALES ---
             const [screen, setScreen] = useState('splash');
             const [loaded, setLoaded] = useState(false);
             const [fallingItems, setFallingItems] = useState([]);
             const [user, setUser] = useState(null);
 
-            // Formulario de Registro
+            // Registro
             const [name, setName] = useState('');
             const [dni, setDni] = useState('');
             const [tyc, setTyc] = useState(false);
@@ -102,6 +111,26 @@
             // Tutorial
             const [handFrame, setHandFrame] = useState(1);
 
+            // Gameloop States
+            const [gameStatus, setGameStatus] = useState('countdown'); // 'countdown', 'playing', 'gameover'
+            const [countdownVal, setCountdownVal] = useState(3);
+            const [activeIngredients, setActiveIngredients] = useState([]);
+            const [smashes, setSmashes] = useState([]);
+            const [burgers, setBurgers] = useState([]);
+            const [flashRed, setFlashRed] = useState(false);
+            
+            // Render states (linked to refs para performance en tiempo real)
+            const [renderScore, setRenderScore] = useState(0);
+            const [renderCombo, setRenderCombo] = useState(0);
+            const [renderLives, setRenderLives] = useState(3);
+
+            // Refs mutables para lógicas de alto rendimiento
+            const scoreRef = useRef(0);
+            const comboRef = useRef(0);
+            const livesRef = useRef(3);
+            const planchaRef = useRef(null);
+            const bgMusic = useRef(null);
+
             // Modales
             const [showTyc, setShowTyc] = useState(false);
             const [showRanking, setShowRanking] = useState(false);
@@ -110,14 +139,14 @@
 
             const baseUrl = 'https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/';
             const rawSuffix = '?raw=true';
-            const bgMusic = useRef(null);
 
             // --- EFECTOS E INICIALIZACIÓN ---
             useEffect(() => {
                 const assetsToLoad = [
                     'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 'fondojuego.png',
                     'logo.png', 'cartel.png', 'registro.png', 'tutorial.png',
-                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'mano1.png', 'mano2.png'
+                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'mano1.png', 'mano2.png',
+                    'corazon.png', 'plancha.png', 'burger.png', 'humo.png'
                 ];
                 
                 let loadedCount = 0;
@@ -146,17 +175,13 @@
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, setUser);
-                
-                return () => {
-                    unsubscribe();
-                };
+                return () => unsubscribe();
             }, []);
 
             // Lluvia de ingredientes (sólo en splash)
             useEffect(() => {
                 if (screen !== 'splash' || !loaded) return;
                 const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
-                
                 const interval = setInterval(() => {
                     const newItem = {
                         id: Math.random().toString(36).substr(2, 9),
@@ -165,30 +190,159 @@
                         left: Math.random() * 90,
                         duration: Math.random() * 3 + 3
                     };
-                    
                     setFallingItems(prev => [...prev, newItem]);
-                    
-                    setTimeout(() => {
-                        setFallingItems(prev => prev.filter(i => i.id !== newItem.id));
-                    }, newItem.duration * 1000);
-                    
+                    setTimeout(() => { setFallingItems(prev => prev.filter(i => i.id !== newItem.id)); }, newItem.duration * 1000);
                 }, 800);
-
                 return () => clearInterval(interval);
             }, [screen, loaded]);
 
-            // Loop de animación de la mano (Tutorial)
+            // Animación mano tutorial
             useEffect(() => {
                 let interval;
                 if (screen === 'tutorial') {
-                    interval = setInterval(() => {
-                        setHandFrame(prev => prev === 1 ? 2 : 1);
-                    }, 250); // Cambia de frame cada 250ms
+                    interval = setInterval(() => { setHandFrame(prev => prev === 1 ? 2 : 1); }, 250);
                 }
                 return () => clearInterval(interval);
             }, [screen]);
 
-            // --- ACCIONES ---
+            // --- LÓGICA DE GAMELOOP ---
+            const startGameLoop = () => {
+                setScreen('game');
+                setGameStatus('countdown');
+                setCountdownVal(3);
+                setActiveIngredients([]);
+                setSmashes([]);
+                setBurgers([]);
+                
+                scoreRef.current = 0;
+                comboRef.current = 0;
+                livesRef.current = 3;
+                setRenderScore(0);
+                setRenderCombo(0);
+                setRenderLives(3);
+            };
+
+            // Countdown Logic
+            useEffect(() => {
+                if (screen === 'game' && gameStatus === 'countdown') {
+                    if (countdownVal > 0) {
+                        const timer = setTimeout(() => setCountdownVal(prev => prev - 1), 1000);
+                        return () => clearTimeout(timer);
+                    } else if (countdownVal === 0) {
+                        const timer = setTimeout(() => {
+                            setGameStatus('playing');
+                        }, 1000);
+                        return () => clearTimeout(timer);
+                    }
+                }
+            }, [screen, gameStatus, countdownVal]);
+
+            // Spawner de ingredientes
+            useEffect(() => {
+                if (screen === 'game' && gameStatus === 'playing') {
+                    const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
+                    // Spawneamos más rápido para darle dinamismo al juego (cada 600ms)
+                    const interval = setInterval(() => {
+                        const newItem = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            type: types[Math.floor(Math.random() * types.length)],
+                            left: Math.random() * 80 + 10, // 10vw to 90vw
+                            duration: Math.random() * 1.5 + 2 // 2s to 3.5s fall speed
+                        };
+                        setActiveIngredients(prev => [...prev, newItem]);
+                        setTimeout(() => {
+                            setActiveIngredients(prev => prev.filter(i => i.id !== newItem.id));
+                        }, newItem.duration * 1000);
+                    }, 600);
+                    return () => clearInterval(interval);
+                }
+            }, [screen, gameStatus]);
+
+            // Fin del Juego y Guardado en Firebase
+            const handleGameOver = async () => {
+                setGameStatus('gameover');
+                if (scoreRef.current > 0 && user && db && window.playerData) {
+                    try {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'), {
+                            name: window.playerData.name,
+                            dni: window.playerData.dni,
+                            score: scoreRef.current,
+                            timestamp: Date.now()
+                        });
+                    } catch (error) {
+                        console.error("Error guardando score:", error);
+                    }
+                }
+            };
+
+            // Detección de Colisiones / Hit Detection
+            const handleGameTap = useCallback((e) => {
+                if (gameStatus !== 'playing') return;
+
+                // Coordenadas absolutas
+                let clientX = e.clientX;
+                let clientY = e.clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                }
+
+                // Chequear si tocó dentro del área de la plancha
+                if (!planchaRef.current) return;
+                const planchaRect = planchaRef.current.getBoundingClientRect();
+                if (clientY < planchaRect.top) return;
+
+                // Generar animación de mano (aparece y luego golpea)
+                const sId = Date.now().toString();
+                setSmashes(prev => [...prev, { id: sId, x: clientX, y: clientY, frame: 1 }]);
+                setTimeout(() => { setSmashes(prev => prev.map(s => s.id === sId ? { ...s, frame: 2 } : s)); }, 50);
+                setTimeout(() => { setSmashes(prev => prev.filter(s => s.id !== sId)); }, 250);
+
+                // Detección de hit por elemento DOM
+                const elementsUnderTap = document.elementsFromPoint(clientX, clientY);
+                const hitItem = elementsUnderTap.find(el => el.dataset.ingredient === "true");
+
+                if (hitItem) {
+                    const id = hitItem.dataset.id;
+                    const type = hitItem.dataset.type;
+
+                    // Desaparecer ingrediente de la UI
+                    setActiveIngredients(prev => prev.filter(ing => ing.id !== id));
+
+                    if (type === 'carne.png') {
+                        // HIT EXITOSO
+                        const currentMultiplier = comboRef.current === 0 ? 1 : comboRef.current + 1;
+                        const pointsEarned = 10 * currentMultiplier;
+                        
+                        scoreRef.current += pointsEarned;
+                        comboRef.current = currentMultiplier;
+                        setRenderScore(scoreRef.current);
+                        setRenderCombo(comboRef.current);
+
+                        // Popup Burger y humo
+                        const bId = Date.now().toString();
+                        setBurgers(prev => [...prev, { id: bId, x: hitItem.getBoundingClientRect().left + 28, y: hitItem.getBoundingClientRect().top + 28, points: pointsEarned }]);
+                        setTimeout(() => { setBurgers(prev => prev.filter(b => b.id !== bId)); }, 2000);
+
+                    } else {
+                        // HIT FALLIDO (Vegetal)
+                        comboRef.current = 0;
+                        livesRef.current -= 1;
+                        setRenderCombo(0);
+                        setRenderLives(livesRef.current);
+                        
+                        // Efecto Flash Rojo
+                        setFlashRed(true);
+                        setTimeout(() => setFlashRed(false), 300);
+
+                        if (livesRef.current <= 0) {
+                            handleGameOver();
+                        }
+                    }
+                }
+            }, [gameStatus]);
+
+            // --- NAVEGACIÓN BÁSICA ---
             const handleEnterClick = () => {
                 if (!loaded) return;
                 bgMusic.current?.play().catch(e => console.log("Audio bloqueado:", e));
@@ -198,23 +352,15 @@
             const handlePlayClick = () => {
                 if (!name.trim() || !dni.trim()) {
                     setNamePlaceholder("¡FALTAN DATOS!");
-                    setName('');
-                    setDni('');
-                    return;
+                    setName(''); setDni(''); return;
                 }
                 if (!tyc) {
                     setTycError(true);
-                    setTimeout(() => setTycError(false), 1000);
-                    return;
+                    setTimeout(() => setTycError(false), 1000); return;
                 }
-
                 window.playerData = { name: name.trim(), dni: dni.trim() };
-                
                 setPlayText("CARGANDO...");
-                setTimeout(() => {
-                    setPlayText("JUGAR");
-                    setScreen('tutorial'); // Transición al tutorial
-                }, 1000);
+                setTimeout(() => { setPlayText("JUGAR"); setScreen('tutorial'); }, 1000);
             };
 
             const fetchLeaderboard = async () => {
@@ -226,27 +372,20 @@
                     const snapshot = await getDocs(lbRef);
                     let scores = [];
                     snapshot.forEach(doc => scores.push({ id: doc.id, ...doc.data() }));
-                    
                     scores.sort((a, b) => b.score - a.score);
                     setLeaderboard(scores.slice(0, 10));
-                } catch (error) {
-                    console.error("Error cargando leaderboard:", error);
-                }
+                } catch (error) { console.error("Error cargando leaderboard:", error); }
                 setLoadingRanking(false);
             };
 
             return (
                 <div className="fixed inset-0 flex justify-center items-center bg-[#1d1e1b]">
-                    <div className="relative w-full h-full max-w-[500px] bg-[#1d1e1b] overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+                    <div className="relative w-full h-full max-w-[500px] bg-[#1d1e1b] overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.8)] touch-none" onPointerDown={screen === 'game' ? handleGameTap : undefined}>
                         
-                        {/* Overlay Global Texturizado FIX: z-9999 absoluto, mixBlendMode directo, opacidad alta */}
+                        {/* Overlay Global Texturizado */}
                         <div 
                             className="absolute inset-0 z-[9999] pointer-events-none bg-cover bg-center" 
-                            style={{ 
-                                backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})`,
-                                mixBlendMode: 'multiply',
-                                opacity: 0.85
-                            }}
+                            style={{ backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})`, mixBlendMode: 'multiply', opacity: 0.85 }}
                         ></div>
 
                         {/* --- PANTALLA 1: SPLASH --- */}
@@ -256,38 +395,21 @@
                                 style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
                                 onClick={handleEnterClick}
                             >
-                                {/* Contenedor de ingredientes que caen */}
                                 <div className="absolute inset-0 overflow-hidden z-[1] pointer-events-none">
                                     {fallingItems.map(item => (
-                                        <img 
-                                            key={item.id}
-                                            src={`${baseUrl}${item.type}${rawSuffix}`} 
-                                            alt="ingrediente"
-                                            className="absolute falling-ingredient"
-                                            style={{ 
-                                                width: `${item.size}px`, 
-                                                left: `${item.left}vw`, 
-                                                animationDuration: `${item.duration}s` 
-                                            }}
-                                        />
+                                        <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}vw`, animationDuration: `${item.duration}s` }} />
                                     ))}
                                 </div>
-
-                                {/* Logo Centrado dinámicamente en el espacio sobrante */}
                                 <div className="flex-grow flex items-center justify-center w-full mt-4">
                                     <div className="relative z-[2] w-[90%] max-w-[400px] tipsy">
-                                        <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
+                                        <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
-
-                                {/* Texto ENTRAR - Agrandado un 30% y sin borde negro/sombra */}
                                 <div className="text-[#fff3e2] text-[2rem] caprasimo uppercase pulse tracking-widest z-[2] mb-[8vh]">
                                     {loaded ? 'ENTRAR' : 'CARGANDO...'}
                                 </div>
-
-                                {/* Cartel Metrónomo - Con margen negativo para ocular el corte inferior */}
                                 <div className="w-[45%] max-w-[180px] pendulum z-[2] -mb-[5%]">
-                                    <img src={`${baseUrl}cartel.png${rawSuffix}`} alt="Burger Fest" className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
+                                    <img src={`${baseUrl}cartel.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
                                 </div>
                             </div>
                         )}
@@ -298,65 +420,33 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[8vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
-                                {/* Grupo Superior: Logos */}
                                 <div className="flex flex-col items-center w-full">
-                                    <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[50%] max-w-[200px] tipsy mb-2" />
-                                    <img src={`${baseUrl}registro.png${rawSuffix}`} alt="Registro" className="w-[60%] max-w-[240px] tipsy-mild" />
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[50%] max-w-[200px] tipsy mb-2" />
+                                    <img src={`${baseUrl}registro.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild" />
                                 </div>
-
-                                {/* Grupo Medio: Formulario */}
                                 <div className="flex flex-col w-[80%] max-w-[320px] gap-2">
                                     <div className="flex flex-col items-center">
                                         <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
-                                        <input 
-                                            type="text" 
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            placeholder={namePlaceholder}
-                                            maxLength="15"
-                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50"
-                                        />
+                                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={namePlaceholder} maxLength="15" className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50" />
                                     </div>
                                     <div className="flex flex-col items-center">
                                         <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
-                                        <input 
-                                            type="tel" 
-                                            value={dni}
-                                            onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))}
-                                            maxLength="12"
-                                            className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]"
-                                        />
+                                        <input type="tel" value={dni} onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} maxLength="12" className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]" />
                                     </div>
-                                    
                                     <div className="flex items-start gap-2 mt-1 px-1">
                                         <div className="relative flex-shrink-0 cursor-pointer mt-1" onClick={() => setTyc(!tyc)}>
                                             <div className="w-5 h-5 bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded flex items-center justify-center">
                                                 {tyc && <span className="text-[#1d1e1b] caprasimo text-sm leading-none mt-1">X</span>}
                                             </div>
                                         </div>
-                                        <div 
-                                            className={`text-[0.7rem] leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`}
-                                            onClick={() => setShowTyc(true)}
-                                        >
+                                        <div className={`text-[0.7rem] leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`} onClick={() => setShowTyc(true)}>
                                             Acepto los términos y condiciones y el tratamiento opcional de datos.
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Grupo Inferior: Botones */}
                                 <div className="flex flex-col items-center gap-6 w-full">
-                                    <button 
-                                        onClick={handlePlayClick}
-                                        className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow"
-                                    >
-                                        {playText}
-                                    </button>
-                                    <button 
-                                        onClick={fetchLeaderboard}
-                                        className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-lg btn-shadow-small tipsy-mild"
-                                    >
-                                        RANKING
-                                    </button>
+                                    <button onClick={handlePlayClick} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow">{playText}</button>
+                                    <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-lg btn-shadow-small tipsy-mild">RANKING</button>
                                 </div>
                             </div>
                         )}
@@ -367,107 +457,175 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[5vh] bg-pan"
                                 style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}
                             >
-                                {/* Logos */}
                                 <div className="flex flex-col items-center w-full">
-                                    <img src={`${baseUrl}logo.png${rawSuffix}`} alt="Logo" className="w-[45%] max-w-[180px] tipsy mb-2" />
-                                    <img src={`${baseUrl}tutorial.png${rawSuffix}`} alt="Tutorial" className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[45%] max-w-[180px] tipsy mb-2" />
+                                    <img src={`${baseUrl}tutorial.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
                                 </div>
-
-                                {/* Píldora 1 - Sin borde negro y fuente grande */}
                                 <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
                                     ¡Smashea las burgers!
                                 </div>
-
-                                {/* Animación de la mano Smashing */}
                                 <div className="relative w-32 h-32 flex items-center justify-center my-4">
-                                    <img 
-                                        src={`${baseUrl}carne.png${rawSuffix}`} 
-                                        alt="Carne" 
-                                        className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" 
-                                    />
-                                    {/* Imágenes de la mano redimensionadas un 30% en duro, manteniendo intactas las traslaciones de su centro */}
-                                    <img 
-                                        src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} 
-                                        alt="Mano" 
-                                        className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`}
-                                        style={{ transition: 'none' }} 
-                                    />
+                                    <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" />
+                                    <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`} style={{ transition: 'none' }} />
                                 </div>
-
-                                {/* Píldora 2 - Sin borde negro y fuente grande */}
                                 <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
                                     ¡No golpees los vegetales!
                                 </div>
-
-                                {/* Vegetales */}
                                 <div className="flex gap-4 my-4">
-                                    <img src={`${baseUrl}tomate.png${rawSuffix}`} alt="Tomate" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
-                                    <img src={`${baseUrl}lechuga.png${rawSuffix}`} alt="Lechuga" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
-                                    <img src={`${baseUrl}papas.png${rawSuffix}`} alt="Papas" className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                    <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
+                                    <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
+                                    <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                </div>
+                                <button onClick={startGameLoop} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2">OK</button>
+                            </div>
+                        )}
+
+                        {/* --- PANTALLA 4: GAMELOOP --- */}
+                        {screen === 'game' && (
+                            <div className="absolute inset-0 z-10 bg-pan" style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}>
+                                
+                                {/* Flash Rojo de daño */}
+                                {flashRed && <div className="absolute inset-0 z-[60] flash-red pointer-events-none"></div>}
+
+                                {/* Capa 4: HUD */}
+                                {gameStatus !== 'gameover' && (
+                                    <div className="absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-4 px-2 pointer-events-none">
+                                        <div className="relative w-full max-w-[450px] h-[65px] bg-[#fab934] border-[4px] border-[#1d1e1b] rounded-[35px] flex justify-between items-center px-4 shadow-[0_5px_0_#1d1e1b]">
+                                            {/* Puntos */}
+                                            <div className="bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-[15px] px-3 py-1 flex flex-col items-center justify-center min-w-[80px]">
+                                                <span className="text-[#1d1e1b] text-[0.65rem] caprasimo leading-none mb-1">PUNTOS</span>
+                                                <span className="text-[#1d1e1b] text-xl caprasimo leading-none">{renderScore}</span>
+                                            </div>
+                                            {/* Combo */}
+                                            <div className="bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-[15px] px-3 py-1 flex flex-col items-center justify-center min-w-[80px]">
+                                                <span className="text-[#1d1e1b] text-[0.65rem] caprasimo leading-none mb-1">COMBO</span>
+                                                <span className="text-[#c7473d] text-xl caprasimo leading-none">{renderCombo === 0 ? '-' : `x${renderCombo}`}</span>
+                                            </div>
+                                            {/* Logo Overlap */}
+                                            <img src={`${baseUrl}logo.png${rawSuffix}`} className="absolute left-1/2 -translate-x-1/2 w-[160px] -top-3 drop-shadow-[0_4px_0_#1d1e1b]" />
+                                        </div>
+                                        {/* Corazones (Vidas) */}
+                                        <div className="flex gap-2 mt-2">
+                                            {[1, 2, 3].map(i => (
+                                                <img 
+                                                    key={i} 
+                                                    src={`${baseUrl}corazon.png${rawSuffix}`} 
+                                                    className={`w-9 h-9 drop-shadow-[0_3px_0_#1d1e1b] transition-all duration-300 ${renderLives < i ? 'grayscale opacity-50' : ''}`} 
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Capa 3: Ingredientes Cayendo */}
+                                {gameStatus === 'playing' && (
+                                    <div className="absolute inset-0 overflow-hidden z-[30] pointer-events-none">
+                                        {activeIngredients.map(ing => (
+                                            <img 
+                                                key={ing.id} 
+                                                data-ingredient="true" 
+                                                data-id={ing.id} 
+                                                data-type={ing.type}
+                                                src={`${baseUrl}${ing.type}${rawSuffix}`} 
+                                                className="absolute falling-game w-14 h-14 drop-shadow-[0_5px_0_#1d1e1b] pointer-events-auto" 
+                                                style={{ left: `${ing.left}vw`, animationDuration: `${ing.duration}s` }} 
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Elementos Dinámicos de Acción (Humo, Burgers, Smash Text) */}
+                                <div className="absolute inset-0 z-[40] pointer-events-none">
+                                    {/* Hamburguesas Smasheadas y Humo */}
+                                    {burgers.map(b => (
+                                        <div key={b.id} className="absolute flex flex-col items-center" style={{ left: b.x - 30, top: b.y - 30 }}>
+                                            <img src={`${baseUrl}humo.png${rawSuffix}`} className="w-10 h-10 float-up absolute bottom-8 z-[2]" />
+                                            <img src={`${baseUrl}burger.png${rawSuffix}`} className="w-16 h-12 z-[1] drop-shadow-[0_4px_0_#1d1e1b]" />
+                                            <div className="absolute -top-12 flex flex-col items-center pop-in">
+                                                <span className="caprasimo text-2xl text-[#fff3e2] text-stroke">¡SMASH!</span>
+                                                <span className="caprasimo text-xl text-[#fab934] text-stroke-small">+{b.points}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    
+                                    {/* Mano de Smash (Frames) */}
+                                    {smashes.map(s => (
+                                        <img 
+                                            key={s.id}
+                                            src={`${baseUrl}${s.frame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`}
+                                            className="absolute drop-shadow-[0_6px_0_#1d1e1b]"
+                                            style={{ 
+                                                width: s.frame === 1 ? '125px' : '145px', 
+                                                height: s.frame === 1 ? '125px' : '145px',
+                                                left: s.x - (s.frame === 1 ? 40 : 60), 
+                                                top: s.y - (s.frame === 1 ? 100 : 90)
+                                            }}
+                                        />
+                                    ))}
                                 </div>
 
-                                {/* Botón OK */}
-                                <button 
-                                    onClick={() => setScreen('game')}
-                                    className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2"
-                                >
-                                    OK
-                                </button>
+                                {/* Capa 2: Plancha (Área Efectiva) */}
+                                {gameStatus !== 'gameover' && (
+                                    <div ref={planchaRef} className="absolute bottom-0 left-0 w-full h-[25%] z-[20] pointer-events-none flex items-end">
+                                        <img src={`${baseUrl}plancha.png${rawSuffix}`} className="w-full h-full object-cover object-top border-t-[4px] border-[#1d1e1b]" />
+                                    </div>
+                                )}
+
+                                {/* UI Overlay: Countdown */}
+                                {gameStatus === 'countdown' && (
+                                    <div className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none">
+                                        <span className="caprasimo text-[#fff3e2] text-8xl text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in" key={countdownVal}>
+                                            {countdownVal > 0 ? countdownVal : '¡VAMOS!'}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* UI Overlay: Game Over */}
+                                {gameStatus === 'gameover' && (
+                                    <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 p-4">
+                                        <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-3xl w-[90%] max-w-[350px] p-6 flex flex-col items-center shadow-[0_10px_0_#1d1e1b] pop-in">
+                                            <h1 className="caprasimo text-5xl text-[#c7473d] text-stroke-yellow mb-2 text-center leading-none">¡FIN!</h1>
+                                            <p className="caprasimo text-[#1d1e1b] text-xl mb-1">PUNTAJE FINAL</p>
+                                            <p className="caprasimo text-[#fab934] text-5xl text-stroke mb-8 drop-shadow-[0_4px_0_#1d1e1b]">{scoreRef.current}</p>
+                                            
+                                            <div className="flex flex-col gap-4 w-full px-4">
+                                                <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">RANKING</button>
+                                                <button onClick={startGameLoop} className="bg-[#fff3e2] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">VOLVER A JUGAR</button>
+                                                <button onClick={() => setScreen('splash')} className="bg-[#fab934] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">INICIO</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {/* --- PANTALLA TEMPORAL: JUEGO (Próximo Paso) --- */}
-                        {screen === 'game' && (
-                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#1d1e1b]">
-                                <h1 className="text-[#fff3e2] caprasimo text-2xl text-center px-4">GAMELOOP EN CONSTRUCCIÓN</h1>
-                                <button 
-                                    onClick={() => setScreen('splash')}
-                                    className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-2 px-6 caprasimo text-xl btn-shadow-small mt-6"
-                                >
-                                    Volver al Inicio
-                                </button>
-                            </div>
-                        )}
-
-                        {/* --- MODAL: TYC --- */}
+                        {/* --- MODALES --- */}
                         {showTyc && (
-                            <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4">
                                 <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
-                                    <button 
-                                        onClick={() => setShowTyc(false)} 
-                                        className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small"
-                                    >
-                                        X
-                                    </button>
+                                    <button onClick={() => setShowTyc(false)} className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small">X</button>
                                     <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-3 mt-0">Términos y Condiciones</h2>
                                     <div className="overflow-y-auto flex-grow font-sans text-[0.85rem] text-[#1d1e1b] leading-relaxed pr-2 retro-scroll">
-                                        <p className="mb-2"><strong>1. Aceptación:</strong> Al participar en BURGER SMASH, aceptas estos términos y condiciones para el evento Burgerfest 2026.</p>
-                                        <p className="mb-2"><strong>2. Uso de datos:</strong> Autorizas a Burgerboy a recopilar tu Nombre y DNI/CE con el único fin de identificarte en la tabla de clasificación y contactarte.</p>
-                                        <p className="mb-2"><strong>3. Mecánica:</strong> El juego es de habilidad. Las puntuaciones se guardan automáticamente con conexión a internet.</p>
-                                        <p className="mb-2"><strong>4. Restricciones:</strong> Cualquier intento de manipulación del sistema o bots resultará en descalificación.</p>
-                                        <p><strong>5. Privacidad:</strong> Tus datos no serán compartidos con terceros sin tu consentimiento.</p>
+                                        <p className="mb-2"><strong>1. Aceptación:</strong> Al participar, aceptas estos T&C.</p>
+                                        <p className="mb-2"><strong>2. Uso de datos:</strong> Autorizas el uso de Nombre y DNI para el ranking.</p>
+                                        <p className="mb-2"><strong>3. Mecánica:</strong> Puntuaciones guardadas con internet.</p>
+                                        <p><strong>4. Restricciones:</strong> Prohibido manipular el sistema.</p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* --- MODAL: RANKING --- */}
                         {showRanking && (
-                            <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4">
                                 <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
-                                    <button 
-                                        onClick={() => setShowRanking(false)} 
-                                        className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small"
-                                    >
-                                        X
-                                    </button>
+                                    <button onClick={() => setShowRanking(false)} className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small">X</button>
                                     <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-4 mt-0">TOP 10 SMASHERS</h2>
                                     <div className="overflow-y-auto flex-grow pr-2 retro-scroll">
                                         <ul className="list-none p-0 m-0 caprasimo text-lg">
                                             {loadingRanking ? (
                                                 <li className="text-center font-sans text-base">Cargando data...</li>
                                             ) : leaderboard.length === 0 ? (
-                                                <li className="text-center font-sans text-base">¡Aún no hay puntuaciones! Sé el primero.</li>
+                                                <li className="text-center font-sans text-base">¡Aún no hay puntuaciones!</li>
                                             ) : (
                                                 leaderboard.map((entry, index) => (
                                                     <li key={entry.id} className="flex justify-between py-2 border-b-2 border-dashed border-[#1d1e1b] last:border-none">
