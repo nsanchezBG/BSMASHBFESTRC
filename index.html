@@ -81,6 +81,10 @@
         .stagger-4 { animation-delay: 0.35s; }
         .stagger-5 { animation-delay: 0.45s; }
         .stagger-6 { animation-delay: 0.55s; }
+
+        /* Estilos Modo Retro */
+        .retro-mode { filter: grayscale(100%) contrast(110%); transition: filter 0.3s ease; }
+        .normal-mode { filter: grayscale(0%) contrast(100%); transition: filter 0.3s ease; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -178,11 +182,16 @@
             const [flashRed, setFlashRed] = useState(false);
             const [isBurgerfest, setIsBurgerfest] = useState(false);
             const [isSmashing, setIsSmashing] = useState(false);
+            const [isRetroMode, setIsRetroMode] = useState(false);
+            const [retroPopup, setRetroPopup] = useState(null);
             
             // Render states (linked to refs para performance en tiempo real)
             const [renderScore, setRenderScore] = useState(0);
             const [renderCombo, setRenderCombo] = useState(0);
             const [renderLives, setRenderLives] = useState(3);
+
+            // Nivel Dinámico
+            const currentLevel = Math.floor(renderScore / 500);
 
             // Refs mutables para lógicas de alto rendimiento
             const scoreRef = useRef(0);
@@ -197,6 +206,7 @@
             const gameStatusRef = useRef('countdown');
             const smashedItemsRef = useRef(new Set());
             const handleGameOverRef = useRef(null);
+            const emptyTapsRef = useRef([]);
 
             // Sincronizar estado del juego en ref para acceso seguro desde los timeouts
             useEffect(() => { gameStatusRef.current = gameStatus; }, [gameStatus]);
@@ -362,7 +372,10 @@
                 setSmashes([]);
                 setBurgers([]);
                 setIsBurgerfest(false);
+                setIsRetroMode(false);
+                setRetroPopup(null);
                 smashedItemsRef.current.clear();
+                emptyTapsRef.current = [];
                 if(burgerfestTimerRef.current) clearTimeout(burgerfestTimerRef.current);
                 
                 scoreRef.current = 0;
@@ -408,21 +421,26 @@
             useEffect(() => {
                 if (screen === 'game' && gameStatus === 'playing') {
                     const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'pan.png', 'queso.png', 'cebolla.png'];
-                    const intervalTime = isBurgerfest ? 200 : 600;
+                    
+                    // Disminuir intervalo (spawnean más rápido) cada nivel (tope de rapidez en nivel alto)
+                    const intervalTime = isBurgerfest ? 200 : Math.max(250, 600 - (currentLevel * 50));
 
                     const interval = setInterval(() => {
                         let typeToSpawn;
-                        let duration = Math.random() * 1.5 + 2; // Default speed
+                        // Multiplicador de velocidad (caída más rápida a mayor nivel)
+                        const speedMultiplier = Math.max(0.4, 1 - (currentLevel * 0.08));
+                        let duration = (Math.random() * 1.5 + 2) * speedMultiplier; 
                         let isBFSpawn = false;
                         
                         if (isBurgerfest) {
                             typeToSpawn = 'carne.png';
-                            duration = Math.random() * 1.5 + 1.5; 
+                            duration = (Math.random() * 1.5 + 1.5) * speedMultiplier; 
                             isBFSpawn = true;
                         } else {
                             const roll = Math.random();
                             if (roll < 0.01) {
                                 typeToSpawn = 'burgerboy.png';
+                                duration = (Math.random() * 1.0 + 1.0) * speedMultiplier; 
                             } else {
                                 typeToSpawn = types[Math.floor(Math.random() * types.length)];
                             }
@@ -468,13 +486,16 @@
                     
                     return () => clearInterval(interval);
                 }
-            }, [screen, gameStatus, isBurgerfest]);
+            }, [screen, gameStatus, isBurgerfest, currentLevel]); // currentLevel recalculado modifica la velocidad del juego
 
             // Fin del Juego y Guardado en Firebase
             const handleGameOver = async () => {
                 playSound('fin.mp3');
                 setGameStatus('gameover');
                 setIsBurgerfest(false);
+                setIsRetroMode(false); // Reset al volver a la normalidad
+                setRetroPopup(null);
+                
                 if (scoreRef.current > 0 && user && db && window.playerData) {
                     try {
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'), {
@@ -524,6 +545,7 @@
                     const id = hitItem.dataset.id;
                     const type = hitItem.dataset.type;
 
+                    emptyTapsRef.current = []; // Rompe la secuencia del Easter Egg
                     smashedItemsRef.current.add(id); // Registrar como smasheado para no penalizar
                     setActiveIngredients(prev => prev.filter(ing => ing.id !== id));
 
@@ -580,6 +602,24 @@
                     playSound('plancha.mp3');
                     comboRef.current = 0;
                     setRenderCombo(0);
+
+                    // Easter Egg Logic
+                    const now = Date.now();
+                    emptyTapsRef.current.push(now);
+                    
+                    if (emptyTapsRef.current.length > 3) {
+                        emptyTapsRef.current.shift();
+                    }
+
+                    if (emptyTapsRef.current.length === 3 && (now - emptyTapsRef.current[0]) <= 500) {
+                        setIsRetroMode(prev => {
+                            const newMode = !prev;
+                            setRetroPopup(newMode ? 'MODO RETRO' : 'MODO NORMAL');
+                            setTimeout(() => setRetroPopup(null), 2000);
+                            return newMode;
+                        });
+                        emptyTapsRef.current = []; // Reset secuencia
+                    }
                 }
             }, [gameStatus]);
 
@@ -715,16 +755,16 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[5vh] bg-pan"
                                 style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}
                             >
-                                <div className={`flex flex-col items-center w-full ${getAnim(1, 5)}`}>
+                                <div className={`flex flex-col items-center w-full ${getAnim(1, 6)}`}>
                                     <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[45%] max-w-[180px] tipsy mb-2" />
                                     <img src={`${baseUrl}tutorial.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
                                 </div>
-                                <div className={`flex justify-center w-full ${getAnim(2, 4)}`}>
+                                <div className={`flex justify-center w-full ${getAnim(2, 5)}`}>
                                     <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
                                         ¡Smashea las burgers!
                                     </div>
                                 </div>
-                                <div className={`relative w-32 h-32 flex items-center justify-center my-4 ${getAnim(3, 3)}`}>
+                                <div className={`relative w-32 h-32 flex items-center justify-center my-4 ${getAnim(3, 4)}`}>
                                     <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" />
                                     <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`} style={{ transition: 'none' }} />
                                 </div>
@@ -757,7 +797,7 @@
 
                         {/* --- PANTALLA 4: GAMELOOP --- */}
                         {screen === 'game' && (
-                            <div className="absolute inset-0 z-10 bg-pan" style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}>
+                            <div className={`absolute inset-0 z-10 bg-pan ${isRetroMode ? 'retro-mode' : 'normal-mode'}`} style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}>
                                 
                                 {/* Flash Rojo de daño */}
                                 {flashRed && <div className="absolute inset-0 z-[60] flash-red pointer-events-none"></div>}
@@ -774,6 +814,15 @@
                                         </div>
                                         <span className="caprasimo text-5xl md:text-6xl text-[#fab934] text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in pulse" style={{animationDelay: '0.1s'}}>
                                             ¡BURGERFEST!
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Retro Mode Popup */}
+                                {retroPopup && gameStatus === 'playing' && (
+                                    <div className="absolute inset-0 z-[80] flex items-center justify-center pointer-events-none">
+                                        <span className="caprasimo text-5xl md:text-6xl text-[#fff3e2] text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in-fade" key={retroPopup}>
+                                            {retroPopup}
                                         </span>
                                     </div>
                                 )}
