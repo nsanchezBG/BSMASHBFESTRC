@@ -69,6 +69,7 @@
         .stagger-3 { animation-delay: 0.25s; }
         .stagger-4 { animation-delay: 0.35s; }
         .stagger-5 { animation-delay: 0.45s; }
+        .stagger-6 { animation-delay: 0.55s; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -122,7 +123,6 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURACIÓN DE FIREBASE ---
-        // Pega aquí las credenciales de tu proyecto de Firebase
         const customFirebaseConfig = {
             apiKey: "AIzaSyCGjq_p5mQXyEBLlKKWHJJGsLM5jrGq8PU",
             authDomain: "bg-dashboard-f3b1c.firebaseapp.com",
@@ -141,7 +141,7 @@
 
         function App() {
             // --- ESTADOS GLOBALES ---
-            const [screen, setScreen] = useState('loading'); // Inicializamos en loading
+            const [screen, setScreen] = useState('loading'); 
             const [isTransitioning, setIsTransitioning] = useState(false);
             const [loaded, setLoaded] = useState(false);
             const [fallingItems, setFallingItems] = useState([]);
@@ -159,7 +159,7 @@
             const [handFrame, setHandFrame] = useState(1);
 
             // Gameloop States
-            const [gameStatus, setGameStatus] = useState('countdown'); // 'countdown', 'playing', 'gameover'
+            const [gameStatus, setGameStatus] = useState('countdown');
             const [countdownVal, setCountdownVal] = useState(3);
             const [activeIngredients, setActiveIngredients] = useState([]);
             const [smashes, setSmashes] = useState([]);
@@ -181,6 +181,12 @@
             const burgerfestTimerRef = useRef(null);
             const sfxCache = useRef({});
             const audioCtxRef = useRef(null);
+            const gameStatusRef = useRef('countdown');
+            const smashedItemsRef = useRef(new Set());
+            const handleGameOverRef = useRef(null);
+
+            // Sincronizar estado del juego en ref para acceso seguro desde los timeouts
+            useEffect(() => { gameStatusRef.current = gameStatus; }, [gameStatus]);
 
             // Modales
             const [showTyc, setShowTyc] = useState(false);
@@ -198,7 +204,7 @@
                     setScreen(nextScreen);
                     setIsTransitioning(false);
                     if (callback) callback();
-                }, 800); // 800ms para asegurar que el slide out (0.4s) y el delay máximo (0.45s) terminen
+                }, 800);
             };
 
             const getAnim = (inStep, outStep) => {
@@ -226,11 +232,17 @@
 
             // --- EFECTOS E INICIALIZACIÓN ---
             useEffect(() => {
+                // Precarga de datos locales (Nombre y DNI)
+                const savedName = localStorage.getItem('burgerboy_name');
+                const savedDni = localStorage.getItem('burgerboy_dni');
+                if (savedName) setName(savedName);
+                if (savedDni) setDni(savedDni);
+
                 // Carga de imágenes
                 const assetsToLoad = [
                     'overlay.png', 'fondosplash.png', 'fondoregistro1.png', 'fondojuego.png',
                     'logo.png', 'cartel.png', 'registro.png', 'tutorial.png',
-                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'mano1.png', 'mano2.png',
+                    'carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'pan.png', 'queso.png', 'cebolla.png', 'mano1.png', 'mano2.png',
                     'corazon.png', 'plancha.png', 'burger.png', 'humo.png', 'burgerboy.png'
                 ];
                 
@@ -294,10 +306,8 @@
                 return () => unsubscribe();
             }, []);
 
-            // Disparar la transición del loader hacia el splashscreen cuando todos los assets estén precargados
             useEffect(() => {
                 if (loaded && screen === 'loading') {
-                    // Pequeña pausa para asegurar que el usuario perciba el sistema de carga
                     setTimeout(() => {
                         changeScreen('splash');
                     }, 800);
@@ -307,13 +317,13 @@
             // Lluvia de ingredientes (sólo en splash)
             useEffect(() => {
                 if (screen !== 'splash') return;
-                const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
+                const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'pan.png', 'queso.png', 'cebolla.png'];
                 const interval = setInterval(() => {
                     const newItem = {
                         id: Math.random().toString(36).substr(2, 9),
                         type: types[Math.floor(Math.random() * types.length)],
                         size: Math.random() * 40 + 40,
-                        left: Math.random() * 90,
+                        left: Math.random() * 80 + 10, // 10% a 90% para no salirse de la pantalla
                         duration: Math.random() * 3 + 3
                     };
                     setFallingItems(prev => [...prev, newItem]);
@@ -339,6 +349,7 @@
                 setSmashes([]);
                 setBurgers([]);
                 setIsBurgerfest(false);
+                smashedItemsRef.current.clear();
                 if(burgerfestTimerRef.current) clearTimeout(burgerfestTimerRef.current);
                 
                 scoreRef.current = 0;
@@ -358,7 +369,6 @@
 
             const handleVolverAJugar = () => {
                 playSound('botones.mp3');
-                // En lugar de cambiar de pantalla, hacemos transición al mismo contenedor de juego reseteando estados
                 setIsTransitioning(true);
                 setTimeout(() => {
                     resetGameStats();
@@ -384,36 +394,61 @@
             // Spawner de ingredientes dinámico
             useEffect(() => {
                 if (screen === 'game' && gameStatus === 'playing') {
-                    const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
+                    const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png', 'pan.png', 'queso.png', 'cebolla.png'];
                     const intervalTime = isBurgerfest ? 200 : 600;
 
                     const interval = setInterval(() => {
                         let typeToSpawn;
-                        let duration;
-
+                        let duration = Math.random() * 1.5 + 2; // Default speed
+                        let isBFSpawn = false;
+                        
                         if (isBurgerfest) {
                             typeToSpawn = 'carne.png';
                             duration = Math.random() * 1.5 + 1.5; 
+                            isBFSpawn = true;
                         } else {
                             const roll = Math.random();
                             if (roll < 0.01) {
                                 typeToSpawn = 'burgerboy.png';
-                                duration = Math.random() * 1.0 + 1.0; 
                             } else {
                                 typeToSpawn = types[Math.floor(Math.random() * types.length)];
-                                duration = Math.random() * 1.5 + 2; 
                             }
                         }
 
                         const newItem = {
                             id: Math.random().toString(36).substr(2, 9),
                             type: typeToSpawn,
-                            left: Math.random() * 80 + 10,
-                            duration: duration
+                            left: Math.random() * 80 + 10, // Utiliza % para mantenerse dentro de los límites
+                            duration: duration,
+                            isBurgerfestSpawn: isBFSpawn
                         };
                         
                         setActiveIngredients(prev => [...prev, newItem]);
+                        
+                        // Determinar si fue fallado al finalizar la caída
                         setTimeout(() => {
+                            if (gameStatusRef.current === 'playing') {
+                                if (!smashedItemsRef.current.has(newItem.id)) {
+                                    // NO FUE GOLPEADO (Se salió de pantalla)
+                                    if (newItem.type === 'carne.png' && !newItem.isBurgerfestSpawn) {
+                                        playSound('verdura.mp3'); // Sonido de daño
+                                        comboRef.current = 0;
+                                        livesRef.current -= 1;
+                                        setRenderCombo(0);
+                                        setRenderLives(livesRef.current);
+                                        
+                                        setFlashRed(true);
+                                        setTimeout(() => setFlashRed(false), 300);
+
+                                        if (livesRef.current <= 0 && handleGameOverRef.current) {
+                                            handleGameOverRef.current();
+                                        }
+                                    }
+                                } else {
+                                    // Limpiar memoria
+                                    smashedItemsRef.current.delete(newItem.id);
+                                }
+                            }
                             setActiveIngredients(prev => prev.filter(i => i.id !== newItem.id));
                         }, newItem.duration * 1000);
                     }, intervalTime);
@@ -440,6 +475,9 @@
                     }
                 }
             };
+            
+            // Mantener referencia actualizada para poder llamarlo desde el setTimeout del spawner
+            useEffect(() => { handleGameOverRef.current = handleGameOver; }, [handleGameOver]);
 
             // Detección de Colisiones / Hit Detection
             const handleGameTap = useCallback((e) => {
@@ -468,6 +506,7 @@
                     const id = hitItem.dataset.id;
                     const type = hitItem.dataset.type;
 
+                    smashedItemsRef.current.add(id); // Registrar como smasheado para no penalizar
                     setActiveIngredients(prev => prev.filter(ing => ing.id !== id));
 
                     if (type === 'carne.png' || type === 'burgerboy.png') {
@@ -546,6 +585,10 @@
                     setTycError(true);
                     setTimeout(() => setTycError(false), 1000); return;
                 }
+                // Guardar en memoria caché del dispositivo
+                localStorage.setItem('burgerboy_name', name.trim());
+                localStorage.setItem('burgerboy_dni', dni.trim());
+                
                 window.playerData = { name: name.trim(), dni: dni.trim() };
                 changeScreen('tutorial');
             };
@@ -590,22 +633,22 @@
                                 style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
                                 onClick={handleEnterClick}
                             >
-                                <div className="absolute inset-0 overflow-hidden z-[1] pointer-events-none">
+                                <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
                                     {fallingItems.map(item => (
-                                        <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}vw`, animationDuration: `${item.duration}s` }} />
+                                        <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}%`, animationDuration: `${item.duration}s` }} />
                                     ))}
                                 </div>
-                                <div className={`flex-grow flex items-center justify-center w-full mt-4 ${getAnim(1, 3)}`}>
-                                    <div className="relative z-[2] w-[90%] max-w-[400px] tipsy">
+                                <div className={`relative z-10 flex-grow flex items-center justify-center w-full mt-4 ${getAnim(1, 3)}`}>
+                                    <div className="relative w-[90%] max-w-[400px] tipsy">
                                         <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
-                                <div className={`z-[2] mb-[8vh] flex justify-center ${getAnim(2, 2)}`}>
+                                <div className={`relative z-10 mb-[8vh] flex justify-center ${getAnim(2, 2)}`}>
                                     <div className="text-[#fff3e2] text-[2rem] caprasimo uppercase pulse tracking-widest">
                                         ENTRAR
                                     </div>
                                 </div>
-                                <div className={`w-[45%] max-w-[180px] z-[2] -mb-[5%] ${getAnim(3, 1)}`}>
+                                <div className={`relative z-10 w-[45%] max-w-[180px] -mb-[5%] ${getAnim(3, 1)}`}>
                                     <img src={`${baseUrl}cartel.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b] pendulum"/>
                                 </div>
                             </div>
@@ -667,18 +710,29 @@
                                     <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" />
                                     <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`} style={{ transition: 'none' }} />
                                 </div>
-                                <div className={`flex flex-col items-center w-full ${getAnim(4, 2)}`}>
+                                <div className={`flex flex-col items-center w-full ${getAnim(4, 3)}`}>
                                     <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
-                                        ¡No golpees los vegetales!
+                                        ¡No golpees los demás ingredientes!
                                     </div>
-                                    <div className="flex gap-4 my-4">
+                                    <div className="flex flex-wrap justify-center gap-3 my-4 px-4">
                                         <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
                                         <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
                                         <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                        <img src={`${baseUrl}pan.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.1s' }} />
+                                        <img src={`${baseUrl}queso.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.3s' }} />
+                                        <img src={`${baseUrl}cebolla.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.5s' }} />
                                     </div>
                                 </div>
-                                <div className={`flex justify-center ${getAnim(5, 1)}`}>
-                                    <button onClick={handleTutorialOk} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2">OK</button>
+                                {/* Píldora de Ojo con este! */}
+                                <div className={`flex flex-col items-center mb-2 ${getAnim(5, 2)}`}>
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-[#fab934] rounded-full blur-md opacity-60 animate-pulse"></div>
+                                        <img src={`${baseUrl}burgerboy.png${rawSuffix}`} className="relative w-10 h-10 tipsy drop-shadow-[0_2px_0_#1d1e1b]" />
+                                    </div>
+                                    <span className="text-[#fff3e2] caprasimo text-[0.8rem] text-stroke-small mt-1 text-center leading-none">¡Ojo con este!</span>
+                                </div>
+                                <div className={`flex justify-center ${getAnim(6, 1)}`}>
+                                    <button onClick={handleTutorialOk} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow">OK</button>
                                 </div>
                             </div>
                         )}
@@ -693,10 +747,14 @@
                                 {/* Flash Dorado de Burgerfest */}
                                 {isBurgerfest && <div className="absolute inset-0 z-[60] flash-gold pointer-events-none"></div>}
 
-                                {/* Texto Overlay Gigante ¡BURGERFEST! */}
+                                {/* Texto Overlay Gigante ¡BURGERFEST! y Logo Dorado */}
                                 {isBurgerfest && gameStatus === 'playing' && (
-                                    <div className="absolute inset-0 z-[70] flex items-center justify-center pointer-events-none">
-                                        <span className="caprasimo text-5xl md:text-6xl text-[#fab934] text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in pulse">
+                                    <div className="absolute inset-0 z-[70] flex flex-col items-center justify-center pointer-events-none">
+                                        <div className="relative mb-4 pop-in pulse">
+                                            <div className="absolute inset-0 bg-[#fab934] rounded-full blur-xl opacity-60 animate-pulse"></div>
+                                            <img src={`${baseUrl}burgerboy.png${rawSuffix}`} className="relative w-32 h-32 drop-shadow-[0_0_15px_rgba(250,185,52,0.8)]" />
+                                        </div>
+                                        <span className="caprasimo text-5xl md:text-6xl text-[#fab934] text-stroke drop-shadow-[0_10px_0_rgba(0,0,0,0.5)] pop-in pulse" style={{animationDelay: '0.1s'}}>
                                             ¡BURGERFEST!
                                         </span>
                                     </div>
@@ -742,7 +800,7 @@
                                                 data-id={ing.id} 
                                                 data-type={ing.type}
                                                 className="absolute falling-game flex justify-center items-center pointer-events-auto" 
-                                                style={{ left: `${ing.left}vw`, animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
+                                                style={{ left: `${ing.left}%`, animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
                                             >
                                                 {/* El ingrediente */}
                                                 <img src={`${baseUrl}${ing.type}${rawSuffix}`} className="w-full h-full drop-shadow-[0_5px_0_#1d1e1b] pointer-events-none" />
