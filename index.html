@@ -51,6 +51,17 @@
         .fade-in { animation: fadeIn 0.3s ease forwards; }
         .fade-out { animation: fadeOut 0.3s ease forwards; }
         
+        /* Nuevas Animaciones: Idle y Smash Bump */
+        @keyframes idlePulseHeart { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+        @keyframes idlePulseLogo { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } 100% { transform: translateX(-50%) scale(1); } }
+        @keyframes smashBump { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes smashBumpLogo { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.1); } 100% { transform: translateX(-50%) scale(1); } }
+        
+        .idle-pulse-heart { animation: idlePulseHeart 2s infinite ease-in-out; }
+        .idle-pulse-logo { animation: idlePulseLogo 2s infinite ease-in-out; }
+        .smash-bump { animation: smashBump 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important; }
+        .smash-bump-logo { animation: smashBumpLogo 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important; }
+        
         /* Animaciones de Transición de Pantallas (Slide in/out) */
         @keyframes slideInRight {
             0% { transform: translateX(120vw); opacity: 0; }
@@ -166,6 +177,7 @@
             const [burgers, setBurgers] = useState([]);
             const [flashRed, setFlashRed] = useState(false);
             const [isBurgerfest, setIsBurgerfest] = useState(false);
+            const [isSmashing, setIsSmashing] = useState(false);
             
             // Render states (linked to refs para performance en tiempo real)
             const [renderScore, setRenderScore] = useState(0);
@@ -179,6 +191,7 @@
             const planchaRef = useRef(null);
             const bgMusic = useRef(null);
             const burgerfestTimerRef = useRef(null);
+            const smashTimeoutRef = useRef(null);
             const sfxCache = useRef({});
             const audioCtxRef = useRef(null);
             const gameStatusRef = useRef('countdown');
@@ -323,7 +336,7 @@
                         id: Math.random().toString(36).substr(2, 9),
                         type: types[Math.floor(Math.random() * types.length)],
                         size: Math.random() * 40 + 40,
-                        left: Math.random() * 80 + 10, // 10% a 90% para no salirse de la pantalla
+                        left: Math.random() * 80 + 10, 
                         duration: Math.random() * 3 + 3
                     };
                     setFallingItems(prev => [...prev, newItem]);
@@ -499,6 +512,11 @@
                 setTimeout(() => { setSmashes(prev => prev.map(s => s.id === sId ? { ...s, frame: 2 } : s)); }, 50);
                 setTimeout(() => { setSmashes(prev => prev.filter(s => s.id !== sId)); }, 250);
 
+                // Disparar animación de palpitar en HUD y corazones
+                setIsSmashing(true);
+                if (smashTimeoutRef.current) clearTimeout(smashTimeoutRef.current);
+                smashTimeoutRef.current = setTimeout(() => setIsSmashing(false), 200);
+
                 const elementsUnderTap = document.elementsFromPoint(clientX, clientY);
                 const hitItem = elementsUnderTap.find(el => el.dataset.ingredient === "true");
 
@@ -635,7 +653,7 @@
                             >
                                 <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
                                     {fallingItems.map(item => (
-                                        <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}%`, animationDuration: `${item.duration}s` }} />
+                                        <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}%`, marginLeft: `-${item.size/2}px`, animationDuration: `${item.duration}s` }} />
                                     ))}
                                 </div>
                                 <div className={`relative z-10 flex-grow flex items-center justify-center w-full mt-4 ${getAnim(1, 3)}`}>
@@ -763,7 +781,7 @@
                                 {/* Capa 4: HUD */}
                                 {gameStatus !== 'gameover' && (
                                     <div className={`absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-10 px-2 pointer-events-none ${getAnim(1, 3)}`}>
-                                        <div className="relative w-full max-w-[450px] h-[65px] bg-[#fab934] border-[4px] border-[#1d1e1b] rounded-[35px] flex justify-between items-center px-4 shadow-[0_5px_0_#1d1e1b]">
+                                        <div className={`relative w-full max-w-[450px] h-[65px] bg-[#fab934] border-[4px] border-[#1d1e1b] rounded-[35px] flex justify-between items-center px-4 shadow-[0_5px_0_#1d1e1b] ${isSmashing ? 'smash-bump' : ''}`}>
                                             {/* Puntos */}
                                             <div className="bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-[15px] px-3 py-1 flex flex-col items-center justify-center min-w-[80px]">
                                                 <span className="text-[#1d1e1b] text-[0.65rem] caprasimo leading-none mb-1">PUNTOS</span>
@@ -775,7 +793,7 @@
                                                 <span className="text-[#c7473d] text-xl caprasimo leading-none">{renderCombo === 0 ? '-' : `x${renderCombo}`}</span>
                                             </div>
                                             {/* Logo Overlap */}
-                                            <img src={`${baseUrl}logo.png${rawSuffix}`} className="absolute left-1/2 -translate-x-1/2 w-[180px] -top-10 drop-shadow-[0_4px_0_#1d1e1b] z-[60]" />
+                                            <img src={`${baseUrl}logo.png${rawSuffix}`} className={`absolute left-1/2 -translate-x-1/2 w-[180px] -top-10 drop-shadow-[0_4px_0_#1d1e1b] z-[60] ${isSmashing ? 'smash-bump-logo' : 'idle-pulse-logo'}`} />
                                         </div>
                                         {/* Corazones (Vidas) */}
                                         <div className="flex gap-2 mt-6 z-[60]">
@@ -783,7 +801,7 @@
                                                 <img 
                                                     key={i} 
                                                     src={`${baseUrl}corazon.png${rawSuffix}`} 
-                                                    className={`w-9 h-9 drop-shadow-[0_3px_0_#1d1e1b] transition-all duration-300 ${renderLives < i ? 'grayscale opacity-50' : ''}`} 
+                                                    className={`w-9 h-9 drop-shadow-[0_3px_0_#1d1e1b] transition-all duration-300 ${renderLives < i ? 'grayscale opacity-50' : ''} ${isSmashing ? 'smash-bump' : 'idle-pulse-heart'}`} 
                                                 />
                                             ))}
                                         </div>
@@ -800,7 +818,7 @@
                                                 data-id={ing.id} 
                                                 data-type={ing.type}
                                                 className="absolute falling-game flex justify-center items-center pointer-events-auto" 
-                                                style={{ left: `${ing.left}%`, animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
+                                                style={{ left: `${ing.left}%`, marginLeft: '-1.75rem', animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
                                             >
                                                 {/* El ingrediente */}
                                                 <img src={`${baseUrl}${ing.type}${rawSuffix}`} className="w-full h-full drop-shadow-[0_5px_0_#1d1e1b] pointer-events-none" />
