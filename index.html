@@ -380,17 +380,16 @@
 
                                 {/* Animación de la mano Smashing */}
                                 <div className="relative w-32 h-32 flex items-center justify-center my-4">
-                                    {/* Carne reducida a w-12 h-12 y desplazada a la parte superior derecha de la espátula */}
                                     <img 
                                         src={`${baseUrl}carne.png${rawSuffix}`} 
                                         alt="Carne" 
                                         className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" 
                                     />
-                                    {/* Cambiamos la imagen según el frame */}
+                                    {/* Imágenes de la mano redimensionadas un 30% en duro, manteniendo intactas las traslaciones de su centro */}
                                     <img 
                                         src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} 
                                         alt="Mano" 
-                                        className={`absolute z-[2] ${handFrame === 1 ? 'w-24 h-24 -translate-y-6 translate-x-4' : 'w-28 h-28 -translate-y-2 translate-x-2'}`}
+                                        className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`}
                                         style={{ transition: 'none' }} 
                                     />
                                 </div>
