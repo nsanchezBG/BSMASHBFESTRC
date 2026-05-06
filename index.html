@@ -122,8 +122,19 @@
         const { useState, useEffect, useRef, useCallback } = React;
 
         // --- CONFIGURACIÓN DE FIREBASE ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+        // Pega aquí las credenciales de tu proyecto de Firebase
+        const customFirebaseConfig = {
+            apiKey: "AIzaSyCGjq_p5mQXyEBLlKKWHJJGsLM5jrGq8PU",
+            authDomain: "bg-dashboard-f3b1c.firebaseapp.com",
+            databaseURL: "https://bg-dashboard-f3b1c-default-rtdb.firebaseio.com",
+            projectId: "bg-dashboard-f3b1c",
+            storageBucket: "bg-dashboard-f3b1c.firebasestorage.app",
+            messagingSenderId: "539003434192",
+            appId: "1:539003434192:web:00a0261155284c3b431ad5"
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : customFirebaseConfig;
+        const app = firebaseConfig.apiKey !== "TU_API_KEY" || (typeof __firebase_config !== 'undefined' && __firebase_config) ? initializeApp(firebaseConfig) : null;
         const auth = app ? getAuth(app) : null;
         const db = app ? getFirestore(app) : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'burger-smash-2026';
