@@ -48,6 +48,27 @@
         .flash-gold { animation: flashGoldLoop 0.3s ease-in-out infinite alternate; }
         .fade-out-burger { animation: fadeOutBurger 2s ease-out forwards; }
         .pop-in-fade { animation: popInFade 2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        .fade-out { animation: fadeOut 0.3s ease forwards; }
+        
+        /* Animaciones de Transición de Pantallas (Slide in/out) */
+        @keyframes slideInRight {
+            0% { transform: translateX(120vw); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutLeft {
+            0% { transform: translateX(0); opacity: 1; }
+            100% { transform: translateX(-120vw); opacity: 0; }
+        }
+        .slide-in { animation: slideInRight 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .slide-out { animation: slideOutLeft 0.5s cubic-bezier(0.6, -0.28, 0.735, 0.045) both; }
+        
+        /* Retrasos Asíncronos (Stagger) para piezas separadas */
+        .stagger-1 { animation-delay: 0.05s; }
+        .stagger-2 { animation-delay: 0.15s; }
+        .stagger-3 { animation-delay: 0.25s; }
+        .stagger-4 { animation-delay: 0.35s; }
+        .stagger-5 { animation-delay: 0.45s; }
         
         /* Utilidades visuales retro */
         .text-stroke { text-shadow: 2px 2px 0 #1d1e1b, -2px -2px 0 #1d1e1b, 2px -2px 0 #1d1e1b, -2px 2px 0 #1d1e1b; }
@@ -80,6 +101,8 @@
             80% { transform: scale(1); opacity: 1; } 
             100% { transform: scale(1); opacity: 0; } 
         }
+        @keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes fadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
 
         /* Scrollbar retro para modal */
         .retro-scroll::-webkit-scrollbar { width: 8px; }
@@ -107,7 +130,8 @@
 
         function App() {
             // --- ESTADOS GLOBALES ---
-            const [screen, setScreen] = useState('splash');
+            const [screen, setScreen] = useState('loading'); // Inicializamos en loading
+            const [isTransitioning, setIsTransitioning] = useState(false);
             const [loaded, setLoaded] = useState(false);
             const [fallingItems, setFallingItems] = useState([]);
             const [user, setUser] = useState(null);
@@ -145,7 +169,7 @@
             const bgMusic = useRef(null);
             const burgerfestTimerRef = useRef(null);
             const sfxCache = useRef({});
-            const audioCtxRef = useRef(null); // Ref para la Web Audio API
+            const audioCtxRef = useRef(null);
 
             // Modales
             const [showTyc, setShowTyc] = useState(false);
@@ -156,25 +180,33 @@
             const baseUrl = 'https://raw.githubusercontent.com/nsanchezBG/BSMASHBFESTRC/main/';
             const rawSuffix = '';
 
+            // --- SISTEMA DE TRANSICIONES ---
+            const changeScreen = (nextScreen, callback) => {
+                setIsTransitioning(true);
+                setTimeout(() => {
+                    setScreen(nextScreen);
+                    setIsTransitioning(false);
+                    if (callback) callback();
+                }, 800); // 800ms para asegurar que el slide out (0.4s) y el delay máximo (0.45s) terminen
+            };
+
+            const getAnim = (inStep, outStep) => {
+                return isTransitioning ? `slide-out stagger-${outStep}` : `slide-in stagger-${inStep}`;
+            };
+
             // --- REPRODUCTOR DE SFX (Web Audio API - Latencia Cero) ---
             const playSound = useCallback((soundName) => {
                 const ctx = audioCtxRef.current;
                 const buffer = sfxCache.current[soundName];
                 
                 if (ctx && buffer) {
-                    // Resume del contexto si el navegador lo suspendió (común en iOS/Android)
                     if (ctx.state === 'suspended') {
                         ctx.resume();
                     }
-                    // Crear el reproductor del buffer
                     const source = ctx.createBufferSource();
                     source.buffer = buffer;
-                    
-                    // Control de volumen
                     const gainNode = ctx.createGain();
                     gainNode.gain.value = 0.8;
-                    
-                    // Conectar y reproducir instantáneamente
                     source.connect(gainNode);
                     gainNode.connect(ctx.destination);
                     source.start(0);
@@ -195,36 +227,46 @@
                 assetsToLoad.forEach(asset => {
                     const img = new Image();
                     img.src = baseUrl + asset + rawSuffix;
-                    img.onload = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
-                    img.onerror = () => { loadedCount++; if (loadedCount === assetsToLoad.length) setLoaded(true); };
+                    img.onload = () => { 
+                        loadedCount++; 
+                        if (loadedCount === assetsToLoad.length) {
+                            setLoaded(true);
+                        } 
+                    };
+                    img.onerror = () => { 
+                        loadedCount++; 
+                        if (loadedCount === assetsToLoad.length) {
+                            setLoaded(true);
+                        } 
+                    };
                 });
 
-                // Carga de Audio de Fondo (Este se mantiene normal porque no requiere solapamiento rápido)
+                // Carga de Audio de Fondo
                 bgMusic.current = new Audio(baseUrl + 'Sugarcup-Shuffle.aac' + rawSuffix);
                 bgMusic.current.loop = true;
                 bgMusic.current.volume = 0.5;
 
-                // Inicializar Web Audio API para SFX sin latencia
+                // Inicializar Web Audio API para SFX
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtxRef.current = new AudioContext();
 
                 const loadSFX = async () => {
-                const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
-                for (const s of sfxList) {
-                    try {
-                        const response = await fetch(baseUrl + s + rawSuffix);
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                        const arrayBuffer = await response.arrayBuffer();
-                        const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
-                        sfxCache.current[s] = audioBuffer;
-                    } catch (err) {
-                        console.error("Error decodificando audio", s, err);
+                    const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
+                    for (const s of sfxList) {
+                        try {
+                            const response = await fetch(baseUrl + s + rawSuffix);
+                            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                            const arrayBuffer = await response.arrayBuffer();
+                            const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
+                            sfxCache.current[s] = audioBuffer;
+                        } catch (err) {
+                            console.error("Error decodificando audio", s, err);
+                        }
                     }
-                }
-            };
-            loadSFX();
+                };
+                loadSFX();
 
-            if (!auth) return;
+                if (!auth) return;
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -241,9 +283,19 @@
                 return () => unsubscribe();
             }, []);
 
+            // Disparar la transición del loader hacia el splashscreen cuando todos los assets estén precargados
+            useEffect(() => {
+                if (loaded && screen === 'loading') {
+                    // Pequeña pausa para asegurar que el usuario perciba el sistema de carga
+                    setTimeout(() => {
+                        changeScreen('splash');
+                    }, 800);
+                }
+            }, [loaded, screen]);
+
             // Lluvia de ingredientes (sólo en splash)
             useEffect(() => {
-                if (screen !== 'splash' || !loaded) return;
+                if (screen !== 'splash') return;
                 const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
                 const interval = setInterval(() => {
                     const newItem = {
@@ -257,7 +309,7 @@
                     setTimeout(() => { setFallingItems(prev => prev.filter(i => i.id !== newItem.id)); }, newItem.duration * 1000);
                 }, 800);
                 return () => clearInterval(interval);
-            }, [screen, loaded]);
+            }, [screen]);
 
             // Animación mano tutorial
             useEffect(() => {
@@ -269,9 +321,7 @@
             }, [screen]);
 
             // --- LÓGICA DE GAMELOOP ---
-            const startGameLoop = () => {
-                playSound('botones.mp3');
-                setScreen('game');
+            const resetGameStats = () => {
                 setGameStatus('countdown');
                 setCountdownVal(3);
                 setActiveIngredients([]);
@@ -286,6 +336,23 @@
                 setRenderScore(0);
                 setRenderCombo(0);
                 setRenderLives(3);
+            };
+
+            const handleTutorialOk = () => {
+                playSound('botones.mp3');
+                changeScreen('game', () => {
+                    resetGameStats();
+                });
+            };
+
+            const handleVolverAJugar = () => {
+                playSound('botones.mp3');
+                // En lugar de cambiar de pantalla, hacemos transición al mismo contenedor de juego reseteando estados
+                setIsTransitioning(true);
+                setTimeout(() => {
+                    resetGameStats();
+                    setIsTransitioning(false);
+                }, 800);
             };
 
             // Countdown Logic
@@ -307,8 +374,6 @@
             useEffect(() => {
                 if (screen === 'game' && gameStatus === 'playing') {
                     const types = ['carne.png', 'lechuga.png', 'papas.png', 'tomate.png'];
-                    
-                    // Intervalo normal: 600ms. En Burgerfest: 200ms
                     const intervalTime = isBurgerfest ? 200 : 600;
 
                     const interval = setInterval(() => {
@@ -316,15 +381,13 @@
                         let duration;
 
                         if (isBurgerfest) {
-                            // Lluvia masiva de puras carnes
                             typeToSpawn = 'carne.png';
                             duration = Math.random() * 1.5 + 1.5; 
                         } else {
-                            // Probabilidad del 1% para Burgerboy (ingrediente dorado)
                             const roll = Math.random();
                             if (roll < 0.01) {
                                 typeToSpawn = 'burgerboy.png';
-                                duration = Math.random() * 1.0 + 1.0; // Cae extremadamente rápido
+                                duration = Math.random() * 1.0 + 1.0; 
                             } else {
                                 typeToSpawn = types[Math.floor(Math.random() * types.length)];
                                 duration = Math.random() * 1.5 + 2; 
@@ -371,7 +434,6 @@
             const handleGameTap = useCallback((e) => {
                 if (gameStatus !== 'playing') return;
 
-                // Coordenadas absolutas
                 let clientX = e.clientX;
                 let clientY = e.clientY;
                 if (e.touches && e.touches.length > 0) {
@@ -379,18 +441,15 @@
                     clientY = e.touches[0].clientY;
                 }
 
-                // Chequear si tocó dentro del área de la plancha
                 if (!planchaRef.current) return;
                 const planchaRect = planchaRef.current.getBoundingClientRect();
                 if (clientY < planchaRect.top) return;
 
-                // Generar animación de mano (aparece y luego golpea)
                 const sId = Date.now().toString();
                 setSmashes(prev => [...prev, { id: sId, x: clientX, y: clientY, frame: 1 }]);
                 setTimeout(() => { setSmashes(prev => prev.map(s => s.id === sId ? { ...s, frame: 2 } : s)); }, 50);
                 setTimeout(() => { setSmashes(prev => prev.filter(s => s.id !== sId)); }, 250);
 
-                // Detección de hit por elemento DOM
                 const elementsUnderTap = document.elementsFromPoint(clientX, clientY);
                 const hitItem = elementsUnderTap.find(el => el.dataset.ingredient === "true");
 
@@ -398,11 +457,9 @@
                     const id = hitItem.dataset.id;
                     const type = hitItem.dataset.type;
 
-                    // Desaparecer ingrediente golpeado de la UI
                     setActiveIngredients(prev => prev.filter(ing => ing.id !== id));
 
                     if (type === 'carne.png' || type === 'burgerboy.png') {
-                        // HIT EXITOSO (Carne o Burgerboy)
                         if (type === 'burgerboy.png') {
                             playSound('burgerfest.mp3');
                         } else {
@@ -410,9 +467,9 @@
                         }
 
                         let currentMultiplier = comboRef.current === 0 ? 1 : comboRef.current + 1;
-                        if (currentMultiplier > 10) currentMultiplier = 10; // Tope máximo del combo x10
+                        if (currentMultiplier > 10) currentMultiplier = 10; 
                         
-                        const basePoints = type === 'burgerboy.png' ? 50 : 10; // Burgerboy da muchos más puntos base
+                        const basePoints = type === 'burgerboy.png' ? 50 : 10; 
                         const pointsEarned = basePoints * currentMultiplier;
                         
                         scoreRef.current += pointsEarned;
@@ -420,7 +477,6 @@
                         setRenderScore(scoreRef.current);
                         setRenderCombo(comboRef.current);
 
-                        // Si tocamos a Burgerboy, ¡Inicia la locura dorada!
                         if (type === 'burgerboy.png') {
                             setIsBurgerfest(true);
                             if(burgerfestTimerRef.current) clearTimeout(burgerfestTimerRef.current);
@@ -429,26 +485,22 @@
                             }, 5000);
                         }
 
-                        // Calcular posición segura para que el texto NO se salga de la pantalla
                         const safeTextX = Math.max(80, Math.min(clientX, window.innerWidth - 80));
                         const hitRect = hitItem.getBoundingClientRect();
-                        const burgerX = hitRect.left + 28; // Centro relativo al ingrediente
+                        const burgerX = hitRect.left + 28; 
                         const burgerY = hitRect.top + 28;
 
-                        // Popup Burger y humo (El texto irá amarrado a safeTextX)
                         const bId = Date.now().toString();
                         setBurgers(prev => [...prev, { id: bId, x: burgerX, y: burgerY, textX: safeTextX, points: pointsEarned }]);
                         setTimeout(() => { setBurgers(prev => prev.filter(b => b.id !== bId)); }, 2000);
 
                     } else {
-                        // HIT FALLIDO (Vegetal)
                         playSound('verdura.mp3');
                         comboRef.current = 0;
                         livesRef.current -= 1;
                         setRenderCombo(0);
                         setRenderLives(livesRef.current);
                         
-                        // Efecto Flash Rojo
                         setFlashRed(true);
                         setTimeout(() => setFlashRed(false), 300);
 
@@ -457,7 +509,6 @@
                         }
                     }
                 } else {
-                    // Si golpea un área vacía de la plancha
                     playSound('plancha.mp3');
                     comboRef.current = 0;
                     setRenderCombo(0);
@@ -466,14 +517,12 @@
 
             // --- NAVEGACIÓN BÁSICA ---
             const handleEnterClick = () => {
-                if (!loaded) return;
-                // Reactivamos el audio context por políticas de usuario en iOS/Android
                 if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
                     audioCtxRef.current.resume();
                 }
                 playSound('botones.mp3');
                 bgMusic.current?.play().catch(e => console.log("Audio bloqueado:", e));
-                setScreen('register');
+                changeScreen('register');
             };
 
             const handlePlayClick = () => {
@@ -487,8 +536,7 @@
                     setTimeout(() => setTycError(false), 1000); return;
                 }
                 window.playerData = { name: name.trim(), dni: dni.trim() };
-                setPlayText("CARGANDO...");
-                setTimeout(() => { setPlayText("JUGAR"); setScreen('tutorial'); }, 1000);
+                changeScreen('tutorial');
             };
 
             const fetchLeaderboard = async () => {
@@ -517,6 +565,13 @@
                             style={{ backgroundImage: `url(${baseUrl}overlay.png${rawSuffix})`, mixBlendMode: 'multiply', opacity: 0.85 }}
                         ></div>
 
+                        {/* --- PANTALLA 0: LOADING --- */}
+                        {screen === 'loading' && (
+                            <div className={`absolute inset-0 z-[110] bg-[#fff3e2] flex flex-col items-center justify-center ${isTransitioning ? 'slide-out stagger-1' : ''}`}>
+                                <span className="caprasimo text-[#1d1e1b] text-4xl pulse tracking-widest">CARGANDO...</span>
+                            </div>
+                        )}
+
                         {/* --- PANTALLA 1: SPLASH --- */}
                         {screen === 'splash' && (
                             <div 
@@ -529,16 +584,18 @@
                                         <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}vw`, animationDuration: `${item.duration}s` }} />
                                     ))}
                                 </div>
-                                <div className="flex-grow flex items-center justify-center w-full mt-4">
+                                <div className={`flex-grow flex items-center justify-center w-full mt-4 ${getAnim(1, 3)}`}>
                                     <div className="relative z-[2] w-[90%] max-w-[400px] tipsy">
                                         <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
-                                <div className="text-[#fff3e2] text-[2rem] caprasimo uppercase pulse tracking-widest z-[2] mb-[8vh]">
-                                    {loaded ? 'ENTRAR' : 'CARGANDO...'}
+                                <div className={`z-[2] mb-[8vh] flex justify-center ${getAnim(2, 2)}`}>
+                                    <div className="text-[#fff3e2] text-[2rem] caprasimo uppercase pulse tracking-widest">
+                                        ENTRAR
+                                    </div>
                                 </div>
-                                <div className="w-[45%] max-w-[180px] pendulum z-[2] -mb-[5%]">
-                                    <img src={`${baseUrl}cartel.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b]"/>
+                                <div className={`w-[45%] max-w-[180px] z-[2] -mb-[5%] ${getAnim(3, 1)}`}>
+                                    <img src={`${baseUrl}cartel.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b] pendulum"/>
                                 </div>
                             </div>
                         )}
@@ -549,11 +606,11 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[8vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
-                                <div className="flex flex-col items-center w-full">
+                                <div className={`flex flex-col items-center w-full ${getAnim(1, 4)}`}>
                                     <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[50%] max-w-[200px] tipsy mb-2" />
                                     <img src={`${baseUrl}registro.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild" />
                                 </div>
-                                <div className="flex flex-col w-[80%] max-w-[320px] gap-2">
+                                <div className={`flex flex-col w-[80%] max-w-[320px] gap-2 ${getAnim(2, 3)}`}>
                                     <div className="flex flex-col items-center">
                                         <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
                                         <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={namePlaceholder} maxLength="15" className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50" />
@@ -573,7 +630,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-center gap-6 w-full">
+                                <div className={`flex flex-col items-center gap-6 w-full ${getAnim(3, 2)}`}>
                                     <button onClick={handlePlayClick} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow">{playText}</button>
                                     <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-lg btn-shadow-small tipsy-mild">RANKING</button>
                                 </div>
@@ -586,26 +643,32 @@
                                 className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[5vh] bg-pan"
                                 style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}
                             >
-                                <div className="flex flex-col items-center w-full">
+                                <div className={`flex flex-col items-center w-full ${getAnim(1, 5)}`}>
                                     <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[45%] max-w-[180px] tipsy mb-2" />
                                     <img src={`${baseUrl}tutorial.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
                                 </div>
-                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
-                                    ¡Smashea las burgers!
+                                <div className={`flex justify-center w-full ${getAnim(2, 4)}`}>
+                                    <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                        ¡Smashea las burgers!
+                                    </div>
                                 </div>
-                                <div className="relative w-32 h-32 flex items-center justify-center my-4">
+                                <div className={`relative w-32 h-32 flex items-center justify-center my-4 ${getAnim(3, 3)}`}>
                                     <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" />
                                     <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`} style={{ transition: 'none' }} />
                                 </div>
-                                <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
-                                    ¡No golpees los vegetales!
+                                <div className={`flex flex-col items-center w-full ${getAnim(4, 2)}`}>
+                                    <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                        ¡No golpees los vegetales!
+                                    </div>
+                                    <div className="flex gap-4 my-4">
+                                        <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
+                                        <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
+                                        <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                    </div>
                                 </div>
-                                <div className="flex gap-4 my-4">
-                                    <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
-                                    <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
-                                    <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                <div className={`flex justify-center ${getAnim(5, 1)}`}>
+                                    <button onClick={handleTutorialOk} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2">OK</button>
                                 </div>
-                                <button onClick={startGameLoop} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow mt-2">OK</button>
                             </div>
                         )}
 
@@ -630,7 +693,7 @@
 
                                 {/* Capa 4: HUD */}
                                 {gameStatus !== 'gameover' && (
-                                    <div className="absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-10 px-2 pointer-events-none">
+                                    <div className={`absolute top-0 left-0 w-full z-[50] flex flex-col items-center pt-10 px-2 pointer-events-none ${getAnim(1, 3)}`}>
                                         <div className="relative w-full max-w-[450px] h-[65px] bg-[#fab934] border-[4px] border-[#1d1e1b] rounded-[35px] flex justify-between items-center px-4 shadow-[0_5px_0_#1d1e1b]">
                                             {/* Puntos */}
                                             <div className="bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-[15px] px-3 py-1 flex flex-col items-center justify-center min-w-[80px]">
@@ -692,13 +755,10 @@
                                     {/* Hamburguesas Smasheadas y Humo */}
                                     {burgers.map(b => (
                                         <React.Fragment key={b.id}>
-                                            {/* Contenedor de la Burger y Humo - Dejamos que la imagen flex-shrink-0 y max-w-none sobresalga de la pantalla */}
                                             <div className="absolute flex flex-col items-center" style={{ left: b.x - 30, top: b.y - 30 }}>
                                                 <img src={`${baseUrl}humo.png${rawSuffix}`} className="w-10 h-10 float-up absolute bottom-8 max-w-none flex-shrink-0 z-[2]" />
                                                 <img src={`${baseUrl}burger.png${rawSuffix}`} className="h-14 w-auto max-w-none flex-shrink-0 z-[3] drop-shadow-[0_4px_0_#1d1e1b] fade-out-burger" />
                                             </div>
-
-                                            {/* Textos de SMASH - Amarrados al textX calculado para NO salir de la pantalla */}
                                             <div className="absolute flex flex-col items-center pop-in-fade z-[10]" style={{ left: b.textX, top: b.y - 80, transform: 'translateX(-50%)' }}>
                                                 <span className="caprasimo text-4xl text-[#fff3e2] text-stroke">¡SMASH!</span>
                                                 <span className="caprasimo text-3xl text-[#fab934] text-stroke-small">+{b.points}</span>
@@ -724,7 +784,7 @@
 
                                 {/* Capa 2: Plancha (Área Efectiva) */}
                                 {gameStatus !== 'gameover' && (
-                                    <div ref={planchaRef} className="absolute bottom-0 left-0 w-full h-[25%] z-[20] pointer-events-none flex items-end">
+                                    <div ref={planchaRef} className={`absolute bottom-0 left-0 w-full h-[25%] z-[20] pointer-events-none flex items-end ${getAnim(2, 2)}`}>
                                         <img src={`${baseUrl}plancha.png${rawSuffix}`} className="w-full h-full object-cover object-top border-t-[4px] border-[#1d1e1b]" />
                                     </div>
                                 )}
@@ -740,16 +800,16 @@
 
                                 {/* UI Overlay: Game Over */}
                                 {gameStatus === 'gameover' && (
-                                    <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 p-4">
-                                        <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-3xl w-[90%] max-w-[350px] p-6 flex flex-col items-center shadow-[0_10px_0_#1d1e1b] pop-in">
+                                    <div className={`absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 p-4 ${isTransitioning ? 'fade-out' : 'fade-in'}`}>
+                                        <div className={`bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-3xl w-[90%] max-w-[350px] p-6 flex flex-col items-center shadow-[0_10px_0_#1d1e1b] ${isTransitioning ? 'slide-out stagger-1' : 'pop-in'}`}>
                                             <h1 className="caprasimo text-5xl text-[#c7473d] text-stroke-yellow mb-2 text-center leading-none">¡FIN!</h1>
                                             <p className="caprasimo text-[#1d1e1b] text-xl mb-1">PUNTAJE FINAL</p>
                                             <p className="caprasimo text-[#fab934] text-5xl text-stroke mb-8 drop-shadow-[0_4px_0_#1d1e1b]">{scoreRef.current}</p>
                                             
                                             <div className="flex flex-col gap-4 w-full px-4">
                                                 <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">RANKING</button>
-                                                <button onClick={startGameLoop} className="bg-[#fff3e2] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">VOLVER A JUGAR</button>
-                                                <button onClick={() => { setScreen('splash'); playSound('botones.mp3'); }} className="bg-[#fab934] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">INICIO</button>
+                                                <button onClick={handleVolverAJugar} className="bg-[#fff3e2] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">VOLVER A JUGAR</button>
+                                                <button onClick={() => { playSound('botones.mp3'); changeScreen('splash'); }} className="bg-[#fab934] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-full py-2 caprasimo text-xl btn-shadow-small w-full">INICIO</button>
                                             </div>
                                         </div>
                                     </div>
@@ -759,8 +819,8 @@
 
                         {/* --- MODALES --- */}
                         {showTyc && (
-                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4">
-                                <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
+                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 fade-in">
+                                <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b] pop-in">
                                     <button onClick={() => { setShowTyc(false); playSound('botones.mp3'); }} className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small">X</button>
                                     <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-3 mt-0">Términos y Condiciones</h2>
                                     <div className="overflow-y-auto flex-grow font-sans text-[0.85rem] text-[#1d1e1b] leading-relaxed pr-2 retro-scroll">
@@ -774,8 +834,8 @@
                         )}
 
                         {showRanking && (
-                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4">
-                                <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b]">
+                            <div className="absolute inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 fade-in">
+                                <div className="bg-[#fff3e2] border-[6px] border-[#1d1e1b] rounded-2xl w-[85%] max-h-[80%] p-5 relative flex flex-col shadow-[0_10px_0_#1d1e1b] pop-in">
                                     <button onClick={() => { setShowRanking(false); playSound('botones.mp3'); }} className="absolute -top-4 -right-4 bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full w-10 h-10 flex items-center justify-center caprasimo text-xl btn-shadow-small">X</button>
                                     <h2 className="text-[#1d1e1b] text-center text-xl caprasimo mb-4 mt-0">TOP 10 SMASHERS</h2>
                                     <div className="overflow-y-auto flex-grow pr-2 retro-scroll">
