@@ -24,7 +24,7 @@
         /* Prevención agresiva de scroll y rebote en móviles */
         body, html {
             margin: 0; padding: 0; background-color: #1d1e1b; overflow: hidden;
-            width: 100%; height: 100%; position: fixed; inset: 0;
+            width: 100%; height: 100dvh; position: fixed; inset: 0;
             touch-action: none; user-select: none; -webkit-user-drag: none;
             -webkit-overflow-scrolling: auto;
         }
@@ -688,7 +688,7 @@
                         {/* --- PANTALLA 1: SPLASH --- */}
                         {screen === 'splash' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[10vh] bg-cover bg-center cursor-pointer"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[4vh] bg-cover bg-center cursor-pointer"
                                 style={{ backgroundImage: `url(${baseUrl}fondosplash.png${rawSuffix})` }}
                                 onClick={handleEnterClick}
                             >
@@ -697,17 +697,17 @@
                                         <img key={item.id} src={`${baseUrl}${item.type}${rawSuffix}`} className="absolute falling-ingredient" style={{ width: `${item.size}px`, left: `${item.left}%`, marginLeft: `-${item.size/2}px`, animationDuration: `${item.duration}s` }} />
                                     ))}
                                 </div>
-                                <div className={`relative z-10 flex-grow flex items-center justify-center w-full mt-4 ${getAnim(1, 3)}`}>
-                                    <div className="relative w-[90%] max-w-[400px] tipsy">
+                                <div className={`relative z-10 flex-grow flex items-center justify-center w-full mt-2 ${getAnim(1, 3)}`}>
+                                    <div className="relative w-[85%] max-w-[350px] tipsy">
                                         <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_8px_0_#1d1e1b]"/>
                                     </div>
                                 </div>
-                                <div className={`relative z-10 mb-[8vh] flex justify-center ${getAnim(2, 2)}`}>
-                                    <div className="text-[#fff3e2] text-[2rem] caprasimo uppercase pulse tracking-widest">
+                                <div className={`relative z-10 mb-[4vh] flex justify-center ${getAnim(2, 2)}`}>
+                                    <div className="text-[#fff3e2] text-[1.8rem] caprasimo uppercase pulse tracking-widest">
                                         ENTRAR
                                     </div>
                                 </div>
-                                <div className={`relative z-10 w-[45%] max-w-[180px] -mb-[5%] ${getAnim(3, 1)}`}>
+                                <div className={`relative z-10 w-[40%] max-w-[160px] -mb-[5%] ${getAnim(3, 1)}`}>
                                     <img src={`${baseUrl}cartel.png${rawSuffix}`} className="w-full h-auto drop-shadow-[0_5px_0_#1d1e1b] pendulum"/>
                                 </div>
                             </div>
@@ -716,21 +716,21 @@
                         {/* --- PANTALLA 2: REGISTRO --- */}
                         {screen === 'register' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[6vh] pb-[8vh] bg-cover bg-center"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-between pt-[4vh] pb-[4vh] bg-cover bg-center"
                                 style={{ backgroundImage: `url(${baseUrl}fondoregistro1.png${rawSuffix})` }}
                             >
                                 <div className={`flex flex-col items-center w-full ${getAnim(1, 4)}`}>
-                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[50%] max-w-[200px] tipsy mb-2" />
-                                    <img src={`${baseUrl}registro.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild" />
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[45%] max-w-[180px] tipsy mb-1" />
+                                    <img src={`${baseUrl}registro.png${rawSuffix}`} className="w-[55%] max-w-[220px] tipsy-mild" />
                                 </div>
-                                <div className={`flex flex-col w-[80%] max-w-[320px] gap-2 ${getAnim(2, 3)}`}>
+                                <div className={`flex flex-col w-[80%] max-w-[300px] gap-2 ${getAnim(2, 3)}`}>
                                     <div className="flex flex-col items-center">
-                                        <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
-                                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={namePlaceholder} maxLength="15" className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50" />
+                                        <label className="text-[#fff3e2] text-base caprasimo text-stroke mb-1 tracking-wider">NOMBRE:</label>
+                                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={namePlaceholder} maxLength="15" className="w-full bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-base text-[#1d1e1b] text-center outline-none shadow-[inset_0_4px_0_rgba(0,0,0,0.3)] placeholder:text-[#1d1e1b]/50" />
                                     </div>
                                     <div className="flex flex-col items-center">
-                                        <label className="text-[#fff3e2] text-lg caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
-                                        <input type="tel" value={dni} onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} maxLength="12" className="w-full bg-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-lg text-[#1d1e1b] text-center outline-none shadow-[inset_0_5px_0_rgba(0,0,0,0.3)]" />
+                                        <label className="text-[#fff3e2] text-base caprasimo text-stroke mb-1 tracking-wider">DNI/CE:</label>
+                                        <input type="tel" value={dni} onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ''))} maxLength="12" className="w-full bg-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-full px-4 py-1.5 caprasimo text-base text-[#1d1e1b] text-center outline-none shadow-[inset_0_4px_0_rgba(0,0,0,0.3)]" />
                                     </div>
                                     <div className="flex items-start gap-2 mt-1 px-1">
                                         <div className="relative flex-shrink-0 cursor-pointer mt-1" onClick={() => { setTyc(!tyc); playSound('botones.mp3'); }}>
@@ -738,14 +738,14 @@
                                                 {tyc && <span className="text-[#1d1e1b] caprasimo text-sm leading-none mt-1">X</span>}
                                             </div>
                                         </div>
-                                        <div className={`text-[0.7rem] leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`} onClick={() => { setShowTyc(true); playSound('botones.mp3'); }}>
+                                        <div className={`text-[0.65rem] leading-tight caprasimo cursor-pointer underline transition-colors duration-300 text-stroke-small ${tycError ? 'text-[#c7473d]' : 'text-[#fff3e2]'}`} onClick={() => { setShowTyc(true); playSound('botones.mp3'); }}>
                                             Acepto los términos y condiciones y el tratamiento opcional de datos.
                                         </div>
                                     </div>
                                 </div>
-                                <div className={`flex flex-col items-center gap-6 w-full ${getAnim(3, 2)}`}>
-                                    <button onClick={handlePlayClick} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[40px] py-2 px-10 caprasimo text-3xl btn-shadow">{playText}</button>
-                                    <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[4px] border-[#1d1e1b] rounded-full py-1 px-6 caprasimo text-lg btn-shadow-small tipsy-mild">RANKING</button>
+                                <div className={`flex flex-col items-center gap-4 w-full ${getAnim(3, 2)}`}>
+                                    <button onClick={handlePlayClick} className="bg-[#fff3e2] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-[30px] py-1.5 px-8 caprasimo text-2xl btn-shadow">{playText}</button>
+                                    <button onClick={fetchLeaderboard} className="bg-[#c7473d] text-[#fff3e2] border-[3px] border-[#1d1e1b] rounded-full py-1 px-5 caprasimo text-base btn-shadow-small tipsy-mild">RANKING</button>
                                 </div>
                             </div>
                         )}
@@ -753,45 +753,45 @@
                         {/* --- PANTALLA 3: TUTORIAL --- */}
                         {screen === 'tutorial' && (
                             <div 
-                                className="absolute inset-0 z-10 flex flex-col items-center justify-between py-[5vh] bg-pan"
+                                className="absolute inset-0 z-10 flex flex-col items-center justify-evenly py-4 px-2 bg-pan"
                                 style={{ backgroundImage: `url(${baseUrl}fondojuego.png${rawSuffix})` }}
                             >
                                 <div className={`flex flex-col items-center w-full ${getAnim(1, 6)}`}>
-                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[45%] max-w-[180px] tipsy mb-2" />
-                                    <img src={`${baseUrl}tutorial.png${rawSuffix}`} className="w-[60%] max-w-[240px] tipsy-mild mb-4" />
+                                    <img src={`${baseUrl}logo.png${rawSuffix}`} className="w-[40%] max-w-[150px] tipsy mb-1" />
+                                    <img src={`${baseUrl}tutorial.png${rawSuffix}`} className="w-[55%] max-w-[200px] tipsy-mild mb-2" />
                                 </div>
                                 <div className={`flex justify-center w-full ${getAnim(2, 5)}`}>
-                                    <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-2xl shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                    <div className="bg-[#c7473d] border-[3px] border-[#1d1e1b] rounded-full px-4 py-1.5 text-[#fff3e2] caprasimo text-xl md:text-2xl shadow-[0_4px_0_#1d1e1b] w-[90%] text-center leading-tight">
                                         ¡Smashea las burgers!
                                     </div>
                                 </div>
-                                <div className={`relative w-32 h-32 flex items-center justify-center my-4 ${getAnim(3, 4)}`}>
-                                    <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-12 h-12 absolute z-[1] drop-shadow-[0_4px_0_#1d1e1b] translate-x-10 -translate-y-8" />
-                                    <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[125px] h-[125px] -translate-y-6 translate-x-4' : 'w-[145px] h-[145px] -translate-y-2 translate-x-2'}`} style={{ transition: 'none' }} />
+                                <div className={`relative w-24 h-24 flex items-center justify-center my-2 lg:my-4 ${getAnim(3, 4)}`}>
+                                    <img src={`${baseUrl}carne.png${rawSuffix}`} className="w-10 h-10 absolute z-[1] drop-shadow-[0_3px_0_#1d1e1b] translate-x-8 -translate-y-6" />
+                                    <img src={`${baseUrl}${handFrame === 1 ? 'mano1.png' : 'mano2.png'}${rawSuffix}`} className={`absolute z-[2] ${handFrame === 1 ? 'w-[100px] h-[100px] -translate-y-4 translate-x-3' : 'w-[115px] h-[115px] -translate-y-1 translate-x-1'}`} style={{ transition: 'none' }} />
                                 </div>
                                 <div className={`flex flex-col items-center w-full ${getAnim(4, 3)}`}>
-                                    <div className="bg-[#c7473d] border-[4px] border-[#1d1e1b] rounded-full px-6 py-2 text-[#fff3e2] caprasimo text-[1.4rem] shadow-[0_4px_0_#1d1e1b] w-[85%] text-center leading-tight">
+                                    <div className="bg-[#c7473d] border-[3px] border-[#1d1e1b] rounded-full px-4 py-1.5 text-[#fff3e2] caprasimo text-[1.1rem] md:text-lg shadow-[0_4px_0_#1d1e1b] w-[90%] text-center leading-tight">
                                         ¡No golpees los demás ingredientes!
                                     </div>
-                                    <div className="flex flex-wrap justify-center gap-3 my-4 px-4">
-                                        <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" />
-                                        <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
-                                        <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
-                                        <img src={`${baseUrl}pan.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.1s' }} />
-                                        <img src={`${baseUrl}queso.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.3s' }} />
-                                        <img src={`${baseUrl}cebolla.png${rawSuffix}`} className="w-12 h-12 tipsy drop-shadow-[0_4px_0_#1d1e1b]" style={{ animationDelay: '0.5s' }} />
+                                    <div className="flex flex-wrap justify-center gap-2 my-2 px-2">
+                                        <img src={`${baseUrl}tomate.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" />
+                                        <img src={`${baseUrl}lechuga.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" style={{ animationDelay: '0.2s' }} />
+                                        <img src={`${baseUrl}papas.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" style={{ animationDelay: '0.4s' }} />
+                                        <img src={`${baseUrl}pan.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" style={{ animationDelay: '0.1s' }} />
+                                        <img src={`${baseUrl}queso.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" style={{ animationDelay: '0.3s' }} />
+                                        <img src={`${baseUrl}cebolla.png${rawSuffix}`} className="w-10 h-10 tipsy drop-shadow-[0_3px_0_#1d1e1b]" style={{ animationDelay: '0.5s' }} />
                                     </div>
                                 </div>
                                 {/* Píldora de Ojo con este! */}
-                                <div className={`flex flex-col items-center mb-2 ${getAnim(5, 2)}`}>
+                                <div className={`flex flex-col items-center mb-1 ${getAnim(5, 2)}`}>
                                     <div className="relative">
                                         <div className="absolute inset-0 bg-[#fab934] rounded-full blur-md opacity-60 animate-pulse"></div>
-                                        <img src={`${baseUrl}burgerboy.png${rawSuffix}`} className="relative w-10 h-10 tipsy drop-shadow-[0_2px_0_#1d1e1b]" />
+                                        <img src={`${baseUrl}burgerboy.png${rawSuffix}`} className="relative w-8 h-8 tipsy drop-shadow-[0_2px_0_#1d1e1b]" />
                                     </div>
-                                    <span className="text-[#fff3e2] caprasimo text-[0.8rem] text-stroke-small mt-1 text-center leading-none">¡Ojo con este!</span>
+                                    <span className="text-[#fff3e2] caprasimo text-[0.7rem] text-stroke-small mt-1 text-center leading-none">¡Ojo con este!</span>
                                 </div>
                                 <div className={`flex justify-center ${getAnim(6, 1)}`}>
-                                    <button onClick={handleTutorialOk} className="bg-[#fff3e2] text-[#1d1e1b] border-[5px] border-[#1d1e1b] rounded-[25px] py-1 px-12 caprasimo text-4xl btn-shadow">OK</button>
+                                    <button onClick={handleTutorialOk} className="bg-[#fff3e2] text-[#1d1e1b] border-[4px] border-[#1d1e1b] rounded-[25px] py-1 px-8 caprasimo text-3xl btn-shadow">OK</button>
                                 </div>
                             </div>
                         )}
