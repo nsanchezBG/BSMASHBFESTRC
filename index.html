@@ -61,7 +61,7 @@
         .idle-pulse-logo { animation: idlePulseLogo 2s infinite ease-in-out; }
         .smash-bump { animation: smashBump 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important; }
         .smash-bump-logo { animation: smashBumpLogo 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important; }
-        
+
         /* Animaciones de Transición de Pantallas (Slide in/out) */
         @keyframes slideInRight {
             0% { transform: translateX(120vw); opacity: 0; }
@@ -440,7 +440,8 @@
                             const roll = Math.random();
                             if (roll < 0.01) {
                                 typeToSpawn = 'burgerboy.png';
-                                duration = (Math.random() * 1.0 + 1.0) * speedMultiplier; 
+                                // Misma fórmula de duración que el resto de ingredientes para que caiga igual
+                                duration = (Math.random() * 1.5 + 2) * speedMultiplier; 
                             } else {
                                 typeToSpawn = types[Math.floor(Math.random() * types.length)];
                             }
@@ -863,24 +864,28 @@
                                         {activeIngredients.map(ing => (
                                             <div 
                                                 key={ing.id} 
-                                                data-ingredient="true" 
-                                                data-id={ing.id} 
-                                                data-type={ing.type}
-                                                className="absolute falling-game flex justify-center items-center pointer-events-auto" 
+                                                className="absolute falling-game" 
                                                 style={{ left: `${ing.left}%`, marginLeft: '-1.75rem', animationDuration: `${ing.duration}s`, width: '3.5rem', height: '3.5rem' }} 
                                             >
-                                                {/* El ingrediente */}
-                                                <img src={`${baseUrl}${ing.type}${rawSuffix}`} className="w-full h-full drop-shadow-[0_5px_0_#1d1e1b] pointer-events-none" />
-                                                
-                                                {/* Efecto exclusivo de Burgerboy (partículas doradas) */}
-                                                {ing.type === 'burgerboy.png' && (
-                                                    <div className="absolute inset-0 pointer-events-none overflow-visible">
-                                                        <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-0 left-0 animate-ping shadow-[0_0_8px_#fab934]"></span>
-                                                        <span className="absolute w-1.5 h-1.5 bg-[#fff3e2] rounded-full bottom-0 right-0 animate-ping shadow-[0_0_8px_#fff3e2]" style={{animationDelay: '0.2s'}}></span>
-                                                        <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-1/2 -right-2 animate-pulse shadow-[0_0_8px_#fab934]"></span>
-                                                        <span className="absolute w-2 h-2 bg-[#fff3e2] rounded-full -bottom-2 left-1/2 animate-bounce shadow-[0_0_8px_#fff3e2]"></span>
-                                                    </div>
-                                                )}
+                                                <div 
+                                                    data-ingredient="true" 
+                                                    data-id={ing.id} 
+                                                    data-type={ing.type}
+                                                    className="w-full h-full flex justify-center items-center pointer-events-auto"
+                                                >
+                                                    {/* El ingrediente */}
+                                                    <img src={`${baseUrl}${ing.type}${rawSuffix}`} className="w-full h-full drop-shadow-[0_5px_0_#1d1e1b] pointer-events-none" />
+                                                    
+                                                    {/* Efecto exclusivo de Burgerboy (partículas doradas) */}
+                                                    {ing.type === 'burgerboy.png' && (
+                                                        <div className="absolute inset-0 pointer-events-none overflow-visible">
+                                                            <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-0 left-0 animate-ping shadow-[0_0_8px_#fab934]"></span>
+                                                            <span className="absolute w-1.5 h-1.5 bg-[#fff3e2] rounded-full bottom-0 right-0 animate-ping shadow-[0_0_8px_#fff3e2]" style={{animationDelay: '0.2s'}}></span>
+                                                            <span className="absolute w-2 h-2 bg-[#fab934] rounded-full top-1/2 -right-2 animate-pulse shadow-[0_0_8px_#fab934]"></span>
+                                                            <span className="absolute w-2 h-2 bg-[#fff3e2] rounded-full -bottom-2 left-1/2 animate-bounce shadow-[0_0_8px_#fff3e2]"></span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
