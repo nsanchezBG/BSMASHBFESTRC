@@ -153,8 +153,8 @@
             const [leaderboard, setLeaderboard] = useState([]);
             const [loadingRanking, setLoadingRanking] = useState(false);
 
-            const baseUrl = 'https://github.com/nsanchezBG/BSMASHBFESTRC/blob/main/';
-            const rawSuffix = '?raw=true';
+            const baseUrl = 'https://raw.githubusercontent.com/nsanchezBG/BSMASHBFESTRC/main/';
+            const rawSuffix = '';
 
             // --- REPRODUCTOR DE SFX (Web Audio API - Latencia Cero) ---
             const playSound = useCallback((soundName) => {
@@ -209,21 +209,22 @@
                 audioCtxRef.current = new AudioContext();
 
                 const loadSFX = async () => {
-                    const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
-                    for (const s of sfxList) {
-                        try {
-                            const response = await fetch(baseUrl + s + rawSuffix);
-                            const arrayBuffer = await response.arrayBuffer();
-                            const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
-                            sfxCache.current[s] = audioBuffer;
-                        } catch (err) {
-                            console.error("Error decodificando audio", s, err);
-                        }
+                const sfxList = ['botones.mp3', 'burgerfest.mp3', 'verdura.mp3', 'plancha.mp3', 'burger.mp3', 'fin.mp3'];
+                for (const s of sfxList) {
+                    try {
+                        const response = await fetch(baseUrl + s + rawSuffix);
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await audioCtxRef.current.decodeAudioData(arrayBuffer);
+                        sfxCache.current[s] = audioBuffer;
+                    } catch (err) {
+                        console.error("Error decodificando audio", s, err);
                     }
-                };
-                loadSFX();
+                }
+            };
+            loadSFX();
 
-                if (!auth) return;
+            if (!auth) return;
                 const initAuth = async () => {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
